@@ -257,6 +257,8 @@ void ApplicationSettingsWidget::loadSettings()
         m_generalUi->autoTypeStartDelaySpinBox->setValue(config()->get(Config::AutoTypeStartDelay).toInt());
     }
 
+    m_generalUi->enableColoredPasswordsCheckBox->setChecked(config()->get(Config::GUI_EnableColoredPasswords).toBool());
+
     m_secUi->clearClipboardCheckBox->setChecked(config()->get(Config::Security_ClearClipboard).toBool());
     m_secUi->clearClipboardSpinBox->setValue(config()->get(Config::Security_ClearClipboardTimeout).toInt());
 
@@ -339,6 +341,7 @@ void ApplicationSettingsWidget::saveSettings()
     config()->set(Config::GUI_CheckForUpdates, m_generalUi->checkForUpdatesOnStartupCheckBox->isChecked());
     config()->set(Config::GUI_CheckForUpdatesIncludeBetas,
                   m_generalUi->checkForUpdatesIncludeBetasCheckBox->isChecked());
+    config()->set(Config::GUI_EnableColoredPasswords, m_generalUi->enableColoredPasswordsCheckBox->isChecked());
 
     config()->set(Config::Security_AutoTypeAsk, m_generalUi->autoTypeAskCheckBox->isChecked());
 

@@ -682,6 +682,13 @@
            </widget>
           </item>
           <item>
+           <widget class="QCheckBox" name="enableColoredPasswordsCheckBox">
+            <property name="text">
+             <string>Enable colored passwords</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <layout class="QHBoxLayout" name="languageLabelLayout_2" stretch="0,0,0,1">
             <property name="spacing">
              <number>8</number>

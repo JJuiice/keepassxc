@@ -87,6 +87,7 @@ public:
         GUI_ApplicationTheme,
         GUI_CheckForUpdates,
         GUI_CheckForUpdatesIncludeBetas,
+        GUI_EnableColoredPasswords,
 
         GUI_MainWindowGeometry,
         GUI_MainWindowState,
