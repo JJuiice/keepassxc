@@ -30,6 +30,8 @@
 #include "core/Group.h"
 #include "core/Metadata.h"
 #include "core/Resources.h"
+#include "core/PasswordHealth.h"
+#include "gui/styles/StateColorPalette.h"
 #ifdef Q_OS_MACOS
 #include "gui/osutils/macutils/MacUtils.h"
 #endif
@@ -129,7 +131,7 @@ int EntryModel::columnCount(const QModelIndex& parent) const
         return 0;
     }
 
-    return 14;
+    return 15;
 }
 
 QVariant EntryModel::data(const QModelIndex& index, int role) const
@@ -247,6 +249,28 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
             return entry->resolveMultiplePlaceholders(entry->username());
         case Password:
             return entry->resolveMultiplePlaceholders(entry->password());
+        case PasswordStrength: {
+            PasswordHealth health(entry->password());
+            int priority = 0;
+
+            switch (health.quality()) {
+            case PasswordHealth::Quality::Bad:
+            case PasswordHealth::Quality::Poor:
+                priority = 1;
+                break;
+            case PasswordHealth::Quality::Weak:
+                priority = 2;
+                break;
+            case PasswordHealth::Quality::Good:
+                priority = 3;
+                break;
+            case PasswordHealth::Quality::Excellent:
+                priority = 4;
+                break;
+            }
+
+            return priority;
+        }
         case Expires:
             // There seems to be no better way of expressing 'infinity'
             return entry->timeInfo().expires() ? entry->timeInfo().expiryTime() : QDateTime(QDate(9999, 1, 1));
@@ -288,6 +312,28 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
                 return resources()->icon("chronometer");
             }
             break;
+        case PasswordStrength:
+            PasswordHealth health(entry->password());
+            StateColorPalette statePalette;
+            QColor color;
+
+            switch (health.quality()) {
+            case PasswordHealth::Quality::Bad:
+            case PasswordHealth::Quality::Poor:
+                color = statePalette.color(StateColorPalette::HealthCritical);
+                break;
+            case PasswordHealth::Quality::Weak:
+                color = statePalette.color(StateColorPalette::HealthBad);
+                break;
+            case PasswordHealth::Quality::Good:
+                color = statePalette.color(StateColorPalette::HealthOk);
+                break;
+            case PasswordHealth::Quality::Excellent:
+                color = statePalette.color(StateColorPalette::HealthExcellent);
+                break;
+            }
+
+            return color;
         }
     } else if (role == Qt::FontRole) {
         QFont font;
@@ -337,6 +383,8 @@ QVariant EntryModel::headerData(int section, Qt::Orientation orientation, int ro
             return tr("Username");
         case Password:
             return tr("Password");
+        case PasswordStrength:
+            return tr("Password Strength");
         case Url:
             return tr("URL");
         case Notes:
@@ -372,6 +420,8 @@ QVariant EntryModel::headerData(int section, Qt::Orientation orientation, int ro
             return tr("Username");
         case Password:
             return tr("Password");
+        case PasswordStrength:
+            return tr("Password Strength");
         case Url:
             return tr("URL");
         case Notes:

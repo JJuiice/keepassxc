@@ -495,6 +495,7 @@ void EntryView::resetViewToDefaults()
     header()->hideSection(EntryModel::Accessed);
     header()->hideSection(EntryModel::Attachments);
     header()->hideSection(EntryModel::Size);
+    header()->hideSection(EntryModel::PasswordStrength);
 
     // Reset column order to logical indices
     for (int i = 0; i < header()->count(); ++i) {
@@ -504,6 +505,7 @@ void EntryView::resetViewToDefaults()
     // Reorder some columns
     header()->moveSection(header()->visualIndex(EntryModel::Paperclip), 1);
     header()->moveSection(header()->visualIndex(EntryModel::Totp), 2);
+    header()->moveSection(header()->visualIndex(EntryModel::PasswordStrength), 6);
 
     // Sort by title or group (depending on the mode)
     m_sortModel->sort(EntryModel::Title, Qt::AscendingOrder);
