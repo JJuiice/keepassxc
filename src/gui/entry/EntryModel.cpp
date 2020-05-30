@@ -364,6 +364,29 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
         if (index.column() == Paperclip) {
             return Qt::AlignCenter;
         }
+    } else if (role == Qt::ToolTipRole) {
+        if (index.column() == PasswordStrength) {
+            PasswordHealth health(entry->password());
+            QString quality;
+
+            switch (health.quality()) {
+            case PasswordHealth::Quality::Bad:
+            case PasswordHealth::Quality::Poor:
+                quality = tr("Poor");
+                break;
+            case PasswordHealth::Quality::Weak:
+                quality = tr("Weak");
+                break;
+            case PasswordHealth::Quality::Good:
+                quality = tr("Good");
+                break;
+            case PasswordHealth::Quality::Excellent:
+                quality = tr("Excellent");
+                break;
+            }
+
+            return quality;
+        }
     }
 
     return QVariant();
