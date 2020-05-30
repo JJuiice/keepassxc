@@ -29,8 +29,8 @@
 #include "core/Global.h"
 #include "core/Group.h"
 #include "core/Metadata.h"
-#include "core/Resources.h"
 #include "core/PasswordHealth.h"
+#include "core/Resources.h"
 #include "gui/styles/StateColorPalette.h"
 #ifdef Q_OS_MACOS
 #include "gui/osutils/macutils/MacUtils.h"
