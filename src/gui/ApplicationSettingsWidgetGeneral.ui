@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>499</width>
-    <height>1174</height>
+    <width>524</width>
+    <height>1392</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -684,9 +684,114 @@
           <item>
            <widget class="QCheckBox" name="enableColoredPasswordsCheckBox">
             <property name="text">
-             <string>Enable colored passwords</string>
+             <string>Enable Colored Passwords</string>
             </property>
            </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="coloredPasswordsHBoxLayout" stretch="0,0">
+            <item>
+             <spacer name="coloredPasswordsSpacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeType">
+               <enum>QSizePolicy::Fixed</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="coloredPasswordsVBoxLayout">
+              <property name="spacing">
+               <number>5</number>
+              </property>
+              <item>
+               <widget class="QGroupBox" name="defaultTextGroupBox">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="title">
+                 <string>Default Text</string>
+                </property>
+                <layout class="QVBoxLayout" name="defaultTextLayout">
+                 <item>
+                  <widget class="QLabel" name="defaultTextColorLabel">
+                   <property name="text">
+                    <string>Text Color:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="defaultTextBackgroundLabel">
+                   <property name="text">
+                    <string>Background Color:</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="digitsGroupBox">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="title">
+                 <string>Digits</string>
+                </property>
+                <layout class="QVBoxLayout" name="digitsLayout">
+                 <item>
+                  <widget class="QLabel" name="digitsColorLabel">
+                   <property name="text">
+                    <string>Digits:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="digitsBackgroundLabel">
+                   <property name="text">
+                    <string>Background:</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+              <item>
+               <widget class="QGroupBox" name="specialCharsGroupBox">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
+                <property name="title">
+                 <string>Special Chars</string>
+                </property>
+                <layout class="QVBoxLayout" name="specialCharsLayout">
+                 <item>
+                  <widget class="QLabel" name="specialCharsColorLabel">
+                   <property name="text">
+                    <string>Special Chars:</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="specialCharsBackgroundLabel">
+                   <property name="text">
+                    <string>Background:</string>
+                   </property>
+                  </widget>
+                 </item>
+                </layout>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
           </item>
           <item>
            <layout class="QHBoxLayout" name="languageLabelLayout_2" stretch="0,0,0,1">

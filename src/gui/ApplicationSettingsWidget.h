@@ -62,6 +62,7 @@ private slots:
     void systrayToggled(bool checked);
     void toolbarSettingsToggled(bool checked);
     void rememberDatabasesToggled(bool checked);
+    void coloredPasswordsToggled(bool checked);
     void checkUpdatesToggled(bool checked);
 
 private:

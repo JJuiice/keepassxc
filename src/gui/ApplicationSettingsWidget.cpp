@@ -77,6 +77,7 @@ protected:
     }
 };
 
+void coloredPasswordsToggled(bool checked);
 ApplicationSettingsWidget::ApplicationSettingsWidget(QWidget* parent)
     : EditWidget(parent)
     , m_secWidget(new QWidget())
@@ -107,6 +108,7 @@ ApplicationSettingsWidget::ApplicationSettingsWidget(QWidget* parent)
     connect(m_generalUi->systrayShowCheckBox, SIGNAL(toggled(bool)), SLOT(systrayToggled(bool)));
     connect(m_generalUi->toolbarHideCheckBox, SIGNAL(toggled(bool)), SLOT(toolbarSettingsToggled(bool)));
     connect(m_generalUi->rememberLastDatabasesCheckBox, SIGNAL(toggled(bool)), SLOT(rememberDatabasesToggled(bool)));
+    connect(m_generalUi->enableColoredPasswordsCheckBox, SIGNAL(toggled(bool)), SLOT(coloredPasswordsToggled(bool)));
     connect(m_generalUi->resetSettingsButton, SIGNAL(clicked()), SLOT(resetSettings()));
 
     connect(m_secUi->clearClipboardCheckBox, SIGNAL(toggled(bool)),
@@ -486,4 +488,11 @@ void ApplicationSettingsWidget::rememberDatabasesToggled(bool checked)
 void ApplicationSettingsWidget::checkUpdatesToggled(bool checked)
 {
     m_generalUi->checkForUpdatesIncludeBetasCheckBox->setEnabled(checked);
+}
+
+void ApplicationSettingsWidget::coloredPasswordsToggled(bool checked)
+{
+    m_generalUi->defaultTextGroupBox->setEnabled(checked);
+    m_generalUi->digitsGroupBox->setEnabled(checked);
+    m_generalUi->specialCharsGroupBox->setEnabled(checked);
 }
