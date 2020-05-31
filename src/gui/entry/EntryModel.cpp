@@ -262,10 +262,8 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
                 priority = 2;
                 break;
             case PasswordHealth::Quality::Good:
-                priority = 3;
-                break;
             case PasswordHealth::Quality::Excellent:
-                priority = 4;
+                priority = 3;
                 break;
             }
 
@@ -326,8 +324,6 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
                 color = statePalette.color(StateColorPalette::HealthBad);
                 break;
             case PasswordHealth::Quality::Good:
-                color = statePalette.color(StateColorPalette::HealthOk);
-                break;
             case PasswordHealth::Quality::Excellent:
                 color = statePalette.color(StateColorPalette::HealthExcellent);
                 break;
@@ -378,8 +374,6 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
                 quality = tr("Weak");
                 break;
             case PasswordHealth::Quality::Good:
-                quality = tr("Good");
-                break;
             case PasswordHealth::Quality::Excellent:
                 quality = tr("Excellent");
                 break;
