@@ -77,7 +77,6 @@ protected:
     }
 };
 
-void coloredPasswordsToggled(bool checked);
 ApplicationSettingsWidget::ApplicationSettingsWidget(QWidget* parent)
     : EditWidget(parent)
     , m_secWidget(new QWidget())
@@ -492,7 +491,6 @@ void ApplicationSettingsWidget::checkUpdatesToggled(bool checked)
 
 void ApplicationSettingsWidget::coloredPasswordsToggled(bool checked)
 {
-    m_generalUi->defaultTextGroupBox->setEnabled(checked);
-    m_generalUi->digitsGroupBox->setEnabled(checked);
-    m_generalUi->specialCharsGroupBox->setEnabled(checked);
+    m_generalUi->coloredPasswordsGroupBox->setEnabled(checked);
+    m_generalUi->coloredPasswordsGroupBox->setVisible(checked);
 }

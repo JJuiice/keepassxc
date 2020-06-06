@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>524</width>
-    <height>1392</height>
+    <width>942</width>
+    <height>1608</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -683,115 +683,270 @@
           </item>
           <item>
            <widget class="QCheckBox" name="enableColoredPasswordsCheckBox">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
             <property name="text">
              <string>Enable Colored Passwords</string>
             </property>
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="coloredPasswordsHBoxLayout" stretch="0,0">
-            <item>
-             <spacer name="coloredPasswordsSpacer">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeType">
-               <enum>QSizePolicy::Fixed</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item>
-             <layout class="QVBoxLayout" name="coloredPasswordsVBoxLayout">
-              <property name="spacing">
-               <number>5</number>
-              </property>
-              <item>
-               <widget class="QGroupBox" name="defaultTextGroupBox">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-                <property name="title">
-                 <string>Default Text</string>
-                </property>
-                <layout class="QVBoxLayout" name="defaultTextLayout">
-                 <item>
-                  <widget class="QLabel" name="defaultTextColorLabel">
-                   <property name="text">
-                    <string>Text Color:</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLabel" name="defaultTextBackgroundLabel">
-                   <property name="text">
-                    <string>Background Color:</string>
-                   </property>
-                  </widget>
-                 </item>
-                </layout>
-               </widget>
-              </item>
-              <item>
-               <widget class="QGroupBox" name="digitsGroupBox">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-                <property name="title">
-                 <string>Digits</string>
-                </property>
-                <layout class="QVBoxLayout" name="digitsLayout">
-                 <item>
-                  <widget class="QLabel" name="digitsColorLabel">
-                   <property name="text">
-                    <string>Digits:</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLabel" name="digitsBackgroundLabel">
-                   <property name="text">
-                    <string>Background:</string>
-                   </property>
-                  </widget>
-                 </item>
-                </layout>
-               </widget>
-              </item>
-              <item>
-               <widget class="QGroupBox" name="specialCharsGroupBox">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-                <property name="title">
-                 <string>Special Chars</string>
-                </property>
-                <layout class="QVBoxLayout" name="specialCharsLayout">
-                 <item>
-                  <widget class="QLabel" name="specialCharsColorLabel">
-                   <property name="text">
-                    <string>Special Chars:</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item>
-                  <widget class="QLabel" name="specialCharsBackgroundLabel">
-                   <property name="text">
-                    <string>Background:</string>
-                   </property>
-                  </widget>
-                 </item>
-                </layout>
-               </widget>
-              </item>
-             </layout>
-            </item>
-           </layout>
+           <widget class="QGroupBox" name="coloredPasswordsGroupBox">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <layout class="QHBoxLayout" name="coloredPasswordsHBoxLayout" stretch="0,0">
+             <item>
+              <spacer name="coloredPasswordsSpacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <layout class="QVBoxLayout" name="coloredPasswordsVBoxLayout">
+               <property name="spacing">
+                <number>5</number>
+               </property>
+               <item>
+                <widget class="QGroupBox" name="defaultTextGroupBox">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="title">
+                  <string>Default Text</string>
+                 </property>
+                 <layout class="QVBoxLayout" name="defaultTextLayout">
+                  <item>
+                   <layout class="QFormLayout" name="defaultTextFormLayout">
+                    <property name="fieldGrowthPolicy">
+                     <enum>QFormLayout::FieldsStayAtSizeHint</enum>
+                    </property>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="defaultTextColorLabel">
+                      <property name="autoFillBackground">
+                       <bool>false</bool>
+                      </property>
+                      <property name="text">
+                       <string>Text Color:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="0">
+                     <widget class="QLabel" name="defaultTextBackgroundLabel">
+                      <property name="text">
+                       <string>Background Color:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="QPushButton" name="defaultTextPushButton">
+                      <property name="styleSheet">
+                       <string notr="true">QPushButton{
+	background-color: rgb(0, 0, 0);
+	border-style: solid;
+	border-width: 2px;
+	border-radius: 5px;
+}
+
+QPushButton:hover{
+	background-color: lightblue;
+} </string>
+                      </property>
+                      <property name="text">
+                       <string/>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="2" column="1">
+                     <widget class="QPushButton" name="defaultTextBackgroundPushButton">
+                      <property name="minimumSize">
+                       <size>
+                        <width>0</width>
+                        <height>0</height>
+                       </size>
+                      </property>
+                      <property name="styleSheet">
+                       <string notr="true">QPushButton{
+	background-color: rgb(255, 255, 255);
+	border-style: solid;
+	border-width: 2px;
+	border-radius: 5px;
+}
+
+QPushButton:hover{
+	background-color: lightblue;
+}</string>
+                      </property>
+                      <property name="text">
+                       <string/>
+                      </property>
+                      <property name="default">
+                       <bool>false</bool>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QGroupBox" name="digitsGroupBox">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="title">
+                  <string>Digits</string>
+                 </property>
+                 <layout class="QVBoxLayout" name="digitsLayout">
+                  <item>
+                   <layout class="QFormLayout" name="digitsFormLayout">
+                    <property name="fieldGrowthPolicy">
+                     <enum>QFormLayout::FieldsStayAtSizeHint</enum>
+                    </property>
+                    <item row="0" column="0">
+                     <widget class="QLabel" name="digitsColorLabel">
+                      <property name="text">
+                       <string>Digits:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="0" column="1">
+                     <widget class="QPushButton" name="digitsColorPushButton">
+                      <property name="styleSheet">
+                       <string notr="true">QPushButton{
+	background-color: rgb(0, 0, 0);
+	border-style: solid;
+	border-width: 2px;
+	border-radius: 5px;
+}
+
+QPushButton:hover{
+	background-color: lightblue;
+} </string>
+                      </property>
+                      <property name="text">
+                       <string/>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="digitsBackgroundLabel">
+                      <property name="text">
+                       <string>Background:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="QPushButton" name="digitsBackgroundPushBox">
+                      <property name="styleSheet">
+                       <string notr="true">QPushButton{
+	background-color: rgb(255, 255, 255);
+	border-style: solid;
+	border-width: 2px;
+	border-radius: 5px;
+}
+
+QPushButton:hover{
+	background-color: lightblue;
+}</string>
+                      </property>
+                      <property name="text">
+                       <string/>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+               <item>
+                <widget class="QGroupBox" name="specialCharsGroupBox">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="title">
+                  <string>Special Chars</string>
+                 </property>
+                 <layout class="QVBoxLayout" name="specialCharsLayout">
+                  <item>
+                   <layout class="QFormLayout" name="specialCharsFormLayout">
+                    <property name="fieldGrowthPolicy">
+                     <enum>QFormLayout::FieldsStayAtSizeHint</enum>
+                    </property>
+                    <item row="0" column="0">
+                     <widget class="QLabel" name="specialCharsColorLabel">
+                      <property name="text">
+                       <string>Special Chars:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="0" column="1">
+                     <widget class="QPushButton" name="specialCharsPushButton">
+                      <property name="styleSheet">
+                       <string notr="true">QPushButton{
+	background-color: rgb(0, 0, 0);
+	border-style: solid;
+	border-width: 2px;
+	border-radius: 5px;
+}
+
+QPushButton:hover{
+	background-color: lightblue;
+} </string>
+                      </property>
+                      <property name="text">
+                       <string/>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="0">
+                     <widget class="QLabel" name="specialCharsBackgroundLabel">
+                      <property name="text">
+                       <string>Background:</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item row="1" column="1">
+                     <widget class="QPushButton" name="specialCharsBackgroundPushButton">
+                      <property name="styleSheet">
+                       <string notr="true">QPushButton{
+	background-color: rgb(255, 255, 255);
+	border-style: solid;
+	border-width: 2px;
+	border-radius: 5px;
+}
+
+QPushButton:hover{
+	background-color: lightblue;
+}</string>
+                      </property>
+                      <property name="text">
+                       <string/>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </widget>
           </item>
           <item>
            <layout class="QHBoxLayout" name="languageLabelLayout_2" stretch="0,0,0,1">
