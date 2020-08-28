@@ -35,17 +35,17 @@ public:
         Title = 1,
         Username = 2,
         Password = 3,
-        PasswordStrength = 4,
-        Url = 5,
-        Notes = 6,
-        Expires = 7,
-        Created = 8,
-        Modified = 9,
-        Accessed = 10,
-        Paperclip = 11,
-        Attachments = 12,
-        Totp = 13,
-        Size = 14
+        Url = 4,
+        Notes = 5,
+        Expires = 6,
+        Created = 7,
+        Modified = 8,
+        Accessed = 9,
+        Paperclip = 10,
+        Attachments = 11,
+        Totp = 12,
+        Size = 13,
+        PasswordStrength = 14
     };
 
     explicit EntryModel(QObject* parent = nullptr);

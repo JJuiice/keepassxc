@@ -505,6 +505,7 @@ void EntryView::resetViewToDefaults()
     // Reorder some columns
     header()->moveSection(header()->visualIndex(EntryModel::Paperclip), 1);
     header()->moveSection(header()->visualIndex(EntryModel::Totp), 2);
+    header()->moveSection(header()->visualIndex(EntryModel::PasswordStrength), 6);
 
     // Sort by title or group (depending on the mode)
     m_sortModel->sort(EntryModel::Title, Qt::AscendingOrder);
