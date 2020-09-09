@@ -24,6 +24,7 @@
 #include "core/DatabaseIcons.h"
 #include "core/Group.h"
 #include "core/Metadata.h"
+#include "core/PasswordHealth.h"
 #include "core/Tools.h"
 #include "totp/totp.h"
 
@@ -51,12 +52,15 @@ Entry::Entry()
     connect(m_attributes, SIGNAL(entryAttributesModified()), SLOT(updateTotp()));
     connect(m_attributes, SIGNAL(entryAttributesModified()), this, SIGNAL(entryModified()));
     connect(m_attributes, SIGNAL(defaultKeyModified()), SLOT(emitDataChanged()));
+    connect(m_attributes, SIGNAL(defaultKeyModified()), SLOT(updatePasswordHealth()));
     connect(m_attachments, SIGNAL(entryAttachmentsModified()), this, SIGNAL(entryModified()));
     connect(m_autoTypeAssociations, SIGNAL(modified()), SIGNAL(entryModified()));
     connect(m_customData, SIGNAL(customDataModified()), this, SIGNAL(entryModified()));
 
     connect(this, SIGNAL(entryModified()), SLOT(updateTimeinfo()));
     connect(this, SIGNAL(entryModified()), SLOT(updateModifiedSinceBegin()));
+
+    updatePasswordHealth();
 }
 
 Entry::~Entry()
@@ -347,6 +351,11 @@ int Entry::size() const
     }
 
     return size;
+}
+
+PasswordHealth::Quality Entry::passwordQuality() const
+{
+    return m_passwordQuality;
 }
 
 bool Entry::isExpired() const
@@ -1301,6 +1310,12 @@ QString Entry::resolveUrl(const QString& url) const
 
     // No valid http URL's found
     return QString("");
+}
+
+void Entry::updatePasswordHealth()
+{
+    PasswordHealth health(password());
+    m_passwordQuality = health.quality();
 }
 
 bool EntryData::operator==(const EntryData& other) const

@@ -33,6 +33,7 @@
 #include "core/EntryAttributes.h"
 #include "core/Global.h"
 #include "core/TimeInfo.h"
+#include "core/PasswordHealth.h"
 
 class Database;
 class Group;
@@ -108,6 +109,7 @@ public:
     QString totp() const;
     QSharedPointer<Totp::Settings> totpSettings() const;
     int size() const;
+    PasswordHealth::Quality passwordQuality() const;
 
     bool hasTotp() const;
     bool isExpired() const;
@@ -257,6 +259,7 @@ private slots:
     void updateTimeinfo();
     void updateModifiedSinceBegin();
     void updateTotp();
+    void updatePasswordHealth();
 
 private:
     QString resolveMultiplePlaceholdersRecursive(const QString& str, int maxDepth) const;
@@ -281,6 +284,7 @@ private:
     bool m_modifiedSinceBegin;
     QPointer<Group> m_group;
     bool m_updateTimeinfo;
+    PasswordHealth::Quality m_passwordQuality;
 };
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(Entry::CloneFlags)

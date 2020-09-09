@@ -310,26 +310,6 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
                 return resources()->icon("chronometer");
             }
             break;
-        case PasswordStrength:
-            PasswordHealth health(entry->password());
-            StateColorPalette statePalette;
-            QColor color;
-
-            switch (health.quality()) {
-            case PasswordHealth::Quality::Bad:
-            case PasswordHealth::Quality::Poor:
-                color = statePalette.color(StateColorPalette::HealthCritical);
-                break;
-            case PasswordHealth::Quality::Weak:
-                color = statePalette.color(StateColorPalette::HealthBad);
-                break;
-            case PasswordHealth::Quality::Good:
-            case PasswordHealth::Quality::Excellent:
-                color = statePalette.color(StateColorPalette::HealthExcellent);
-                break;
-            }
-
-            return color;
         }
     } else if (role == Qt::FontRole) {
         QFont font;
@@ -339,7 +319,28 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
         return font;
     } else if (role == Qt::ForegroundRole) {
         QColor foregroundColor;
-        foregroundColor.setNamedColor(entry->foregroundColor());
+
+        if (index.column() == PasswordStrength) {
+            PasswordHealth::Quality pQuality = entry->passwordQuality();
+            StateColorPalette statePalette;
+
+            switch (pQuality) {
+            case PasswordHealth::Quality::Bad:
+            case PasswordHealth::Quality::Poor:
+                foregroundColor = statePalette.color(StateColorPalette::HealthCritical);
+                break;
+            case PasswordHealth::Quality::Weak:
+                foregroundColor = statePalette.color(StateColorPalette::HealthBad);
+                break;
+            case PasswordHealth::Quality::Good:
+            case PasswordHealth::Quality::Excellent:
+                foregroundColor = statePalette.color(StateColorPalette::HealthExcellent);
+                break;
+            }
+        } else {
+            foregroundColor.setNamedColor(entry->foregroundColor());
+        }
+
         if (entry->hasReferences()) {
             QPalette p;
             foregroundColor = p.color(QPalette::Current, QPalette::Text);
@@ -362,10 +363,10 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
         }
     } else if (role == Qt::ToolTipRole) {
         if (index.column() == PasswordStrength) {
-            PasswordHealth health(entry->password());
+            PasswordHealth::Quality pQuality = entry->passwordQuality();
             QString quality;
 
-            switch (health.quality()) {
+            switch (pQuality) {
             case PasswordHealth::Quality::Bad:
             case PasswordHealth::Quality::Poor:
                 quality = tr("Poor");
