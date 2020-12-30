@@ -25,8 +25,10 @@
 #include "autotype/AutoType.h"
 #include "core/Config.h"
 #include "core/Global.h"
-#include "core/Resources.h"
 #include "core/Translator.h"
+#include "gui/Icons.h"
+#include "gui/MainWindow.h"
+#include "gui/osutils/OSUtils.h"
 
 #include "MessageBox.h"
 #include "touchid/TouchID.h"
@@ -91,8 +93,8 @@ ApplicationSettingsWidget::ApplicationSettingsWidget(QWidget* parent)
 
     m_secUi->setupUi(m_secWidget);
     m_generalUi->setupUi(m_generalWidget);
-    addPage(tr("General"), Resources::instance()->icon("preferences-other"), m_generalWidget);
-    addPage(tr("Security"), Resources::instance()->icon("security-high"), m_secWidget);
+    addPage(tr("General"), icons()->icon("preferences-other"), m_generalWidget);
+    addPage(tr("Security"), icons()->icon("security-high"), m_secWidget);
 
     if (!autoType()->isAvailable()) {
         m_generalUi->generalSettingsTabWidget->removeTab(1);
@@ -105,7 +107,6 @@ ApplicationSettingsWidget::ApplicationSettingsWidget(QWidget* parent)
     connect(m_generalUi->autoSaveAfterEveryChangeCheckBox, SIGNAL(toggled(bool)), SLOT(autoSaveToggled(bool)));
     connect(m_generalUi->hideWindowOnCopyCheckBox, SIGNAL(toggled(bool)), SLOT(hideWindowOnCopyCheckBoxToggled(bool)));
     connect(m_generalUi->systrayShowCheckBox, SIGNAL(toggled(bool)), SLOT(systrayToggled(bool)));
-    connect(m_generalUi->toolbarHideCheckBox, SIGNAL(toggled(bool)), SLOT(toolbarSettingsToggled(bool)));
     connect(m_generalUi->rememberLastDatabasesCheckBox, SIGNAL(toggled(bool)), SLOT(rememberDatabasesToggled(bool)));
     connect(m_generalUi->enableColoredPasswordsCheckBox, SIGNAL(toggled(bool)), SLOT(coloredPasswordsToggled(bool)));
     connect(m_generalUi->resetSettingsButton, SIGNAL(clicked()), SLOT(resetSettings()));
@@ -126,7 +127,7 @@ ApplicationSettingsWidget::ApplicationSettingsWidget(QWidget* parent)
     m_generalUi->faviconTimeoutSpinBox->installEventFilter(mouseWheelFilter);
     m_generalUi->toolButtonStyleComboBox->installEventFilter(mouseWheelFilter);
     m_generalUi->languageComboBox->installEventFilter(mouseWheelFilter);
-    m_generalUi->appThemeSelection->installEventFilter(mouseWheelFilter);
+    m_generalUi->trayIconAppearance->installEventFilter(mouseWheelFilter);
 
 #ifdef WITH_XC_UPDATECHECK
     connect(m_generalUi->checkForUpdatesOnStartupCheckBox, SIGNAL(toggled(bool)), SLOT(checkUpdatesToggled(bool)));
@@ -174,32 +175,32 @@ void ApplicationSettingsWidget::loadSettings()
 
 #ifdef QT_DEBUG
     m_generalUi->singleInstanceCheckBox->setEnabled(false);
+    m_generalUi->launchAtStartup->setEnabled(false);
 #endif
     m_generalUi->singleInstanceCheckBox->setChecked(config()->get(Config::SingleInstance).toBool());
+    m_generalUi->launchAtStartup->setChecked(osUtils->isLaunchAtStartupEnabled());
     m_generalUi->rememberLastDatabasesCheckBox->setChecked(config()->get(Config::RememberLastDatabases).toBool());
     m_generalUi->rememberLastKeyFilesCheckBox->setChecked(config()->get(Config::RememberLastKeyFiles).toBool());
     m_generalUi->openPreviousDatabasesOnStartupCheckBox->setChecked(
         config()->get(Config::OpenPreviousDatabasesOnStartup).toBool());
     m_generalUi->autoSaveAfterEveryChangeCheckBox->setChecked(config()->get(Config::AutoSaveAfterEveryChange).toBool());
     m_generalUi->autoSaveOnExitCheckBox->setChecked(config()->get(Config::AutoSaveOnExit).toBool());
+    m_generalUi->autoSaveNonDataChangesCheckBox->setChecked(config()->get(Config::AutoSaveNonDataChanges).toBool());
     m_generalUi->backupBeforeSaveCheckBox->setChecked(config()->get(Config::BackupBeforeSave).toBool());
     m_generalUi->useAtomicSavesCheckBox->setChecked(config()->get(Config::UseAtomicSaves).toBool());
     m_generalUi->autoReloadOnChangeCheckBox->setChecked(config()->get(Config::AutoReloadOnChange).toBool());
     m_generalUi->minimizeAfterUnlockCheckBox->setChecked(config()->get(Config::MinimizeAfterUnlock).toBool());
     m_generalUi->minimizeOnOpenUrlCheckBox->setChecked(config()->get(Config::MinimizeOnOpenUrl).toBool());
     m_generalUi->hideWindowOnCopyCheckBox->setChecked(config()->get(Config::HideWindowOnCopy).toBool());
+    hideWindowOnCopyCheckBoxToggled(m_generalUi->hideWindowOnCopyCheckBox->isChecked());
     m_generalUi->minimizeOnCopyRadioButton->setChecked(config()->get(Config::MinimizeOnCopy).toBool());
     m_generalUi->dropToBackgroundOnCopyRadioButton->setChecked(config()->get(Config::DropToBackgroundOnCopy).toBool());
     m_generalUi->useGroupIconOnEntryCreationCheckBox->setChecked(
         config()->get(Config::UseGroupIconOnEntryCreation).toBool());
     m_generalUi->autoTypeEntryTitleMatchCheckBox->setChecked(config()->get(Config::AutoTypeEntryTitleMatch).toBool());
     m_generalUi->autoTypeEntryURLMatchCheckBox->setChecked(config()->get(Config::AutoTypeEntryURLMatch).toBool());
-    m_generalUi->ignoreGroupExpansionCheckBox->setChecked(config()->get(Config::IgnoreGroupExpansion).toBool());
+    m_generalUi->autoTypeHideExpiredEntryCheckBox->setChecked(config()->get(Config::AutoTypeHideExpiredEntry).toBool());
     m_generalUi->faviconTimeoutSpinBox->setValue(config()->get(Config::FaviconDownloadTimeout).toInt());
-
-    if (!m_generalUi->hideWindowOnCopyCheckBox->isChecked()) {
-        hideWindowOnCopyCheckBoxToggled(false);
-    }
 
     m_generalUi->languageComboBox->clear();
     QList<QPair<QString, QString>> languages = Translator::availableLanguages();
@@ -211,18 +212,8 @@ void ApplicationSettingsWidget::loadSettings()
         m_generalUi->languageComboBox->setCurrentIndex(defaultIndex);
     }
 
-    m_generalUi->previewHideCheckBox->setChecked(config()->get(Config::GUI_HidePreviewPanel).toBool());
-    m_generalUi->toolbarHideCheckBox->setChecked(config()->get(Config::GUI_HideToolbar).toBool());
     m_generalUi->toolbarMovableCheckBox->setChecked(config()->get(Config::GUI_MovableToolbar).toBool());
     m_generalUi->monospaceNotesCheckBox->setChecked(config()->get(Config::GUI_MonospaceNotes).toBool());
-
-    m_generalUi->appThemeSelection->clear();
-    m_generalUi->appThemeSelection->addItem(tr("Automatic"), QStringLiteral("auto"));
-    m_generalUi->appThemeSelection->addItem(tr("Light"), QStringLiteral("light"));
-    m_generalUi->appThemeSelection->addItem(tr("Dark"), QStringLiteral("dark"));
-    m_generalUi->appThemeSelection->addItem(tr("Classic (Platform-native)"), QStringLiteral("classic"));
-    m_generalUi->appThemeSelection->setCurrentIndex(
-        m_generalUi->appThemeSelection->findData(config()->get(Config::GUI_ApplicationTheme).toString()));
 
     m_generalUi->toolButtonStyleComboBox->clear();
     m_generalUi->toolButtonStyleComboBox->addItem(tr("Icon only"), Qt::ToolButtonIconOnly);
@@ -237,13 +228,15 @@ void ApplicationSettingsWidget::loadSettings()
     }
 
     m_generalUi->systrayShowCheckBox->setChecked(config()->get(Config::GUI_ShowTrayIcon).toBool());
-    m_generalUi->systrayDarkIconCheckBox->setChecked(config()->get(Config::GUI_DarkTrayIcon).toBool());
+    systrayToggled(m_generalUi->systrayShowCheckBox->isChecked());
     m_generalUi->systrayMinimizeToTrayCheckBox->setChecked(config()->get(Config::GUI_MinimizeToTray).toBool());
     m_generalUi->minimizeOnCloseCheckBox->setChecked(config()->get(Config::GUI_MinimizeOnClose).toBool());
     m_generalUi->systrayMinimizeOnStartup->setChecked(config()->get(Config::GUI_MinimizeOnStartup).toBool());
     m_generalUi->checkForUpdatesOnStartupCheckBox->setChecked(config()->get(Config::GUI_CheckForUpdates).toBool());
+    checkUpdatesToggled(m_generalUi->checkForUpdatesOnStartupCheckBox->isChecked());
     m_generalUi->checkForUpdatesIncludeBetasCheckBox->setChecked(
         config()->get(Config::GUI_CheckForUpdatesIncludeBetas).toBool());
+
     m_generalUi->autoTypeAskCheckBox->setChecked(config()->get(Config::Security_AutoTypeAsk).toBool());
 
     if (autoType()->isAvailable()) {
@@ -260,6 +253,15 @@ void ApplicationSettingsWidget::loadSettings()
 
     m_generalUi->enableColoredPasswordsCheckBox->setChecked(config()->get(Config::GUI_EnableColoredPasswords).toBool());
 
+    m_generalUi->trayIconAppearance->clear();
+    m_generalUi->trayIconAppearance->addItem(tr("Monochrome (light)"), "monochrome-light");
+    m_generalUi->trayIconAppearance->addItem(tr("Monochrome (dark)"), "monochrome-dark");
+    m_generalUi->trayIconAppearance->addItem(tr("Colorful"), "colorful");
+    int trayIconIndex = m_generalUi->trayIconAppearance->findData(icons()->trayIconAppearance());
+    if (trayIconIndex > 0) {
+        m_generalUi->trayIconAppearance->setCurrentIndex(trayIconIndex);
+    }
+
     m_secUi->clearClipboardCheckBox->setChecked(config()->get(Config::Security_ClearClipboard).toBool());
     m_secUi->clearClipboardSpinBox->setValue(config()->get(Config::Security_ClearClipboardTimeout).toInt());
 
@@ -274,12 +276,15 @@ void ApplicationSettingsWidget::loadSettings()
     m_secUi->relockDatabaseAutoTypeCheckBox->setChecked(config()->get(Config::Security_RelockAutoType).toBool());
     m_secUi->fallbackToSearch->setChecked(config()->get(Config::Security_IconDownloadFallback).toBool());
 
-    m_secUi->passwordCleartextCheckBox->setChecked(config()->get(Config::Security_PasswordsCleartext).toBool());
-    m_secUi->passwordShowDotsCheckBox->setChecked(config()->get(Config::Security_PasswordEmptyNoDots).toBool());
+    m_secUi->passwordsHiddenCheckBox->setChecked(config()->get(Config::Security_PasswordsHidden).toBool());
+    m_secUi->passwordShowDotsCheckBox->setChecked(config()->get(Config::Security_PasswordEmptyPlaceholder).toBool());
     m_secUi->passwordPreviewCleartextCheckBox->setChecked(
         config()->get(Config::Security_HidePasswordPreviewPanel).toBool());
-    m_secUi->passwordRepeatCheckBox->setChecked(config()->get(Config::Security_PasswordsRepeat).toBool());
+    m_secUi->passwordsRepeatVisibleCheckBox->setChecked(
+        config()->get(Config::Security_PasswordsRepeatVisible).toBool());
     m_secUi->hideNotesCheckBox->setChecked(config()->get(Config::Security_HideNotes).toBool());
+    m_secUi->NoConfirmMoveEntryToRecycleBinCheckBox->setChecked(
+        config()->get(Config::Security_NoConfirmMoveEntryToRecycleBin).toBool());
 
     m_secUi->touchIDResetCheckBox->setChecked(config()->get(Config::Security_ResetTouchId).toBool());
     m_secUi->touchIDResetSpinBox->setValue(config()->get(Config::Security_ResetTouchIdTimeout).toInt());
@@ -302,6 +307,10 @@ void ApplicationSettingsWidget::saveSettings()
         return;
     }
 
+#ifndef QT_DEBUG
+    osUtils->setLaunchAtStartup(m_generalUi->launchAtStartup->isChecked());
+#endif
+
     config()->set(Config::SingleInstance, m_generalUi->singleInstanceCheckBox->isChecked());
     config()->set(Config::RememberLastDatabases, m_generalUi->rememberLastDatabasesCheckBox->isChecked());
     config()->set(Config::RememberLastKeyFiles, m_generalUi->rememberLastKeyFilesCheckBox->isChecked());
@@ -309,6 +318,7 @@ void ApplicationSettingsWidget::saveSettings()
                   m_generalUi->openPreviousDatabasesOnStartupCheckBox->isChecked());
     config()->set(Config::AutoSaveAfterEveryChange, m_generalUi->autoSaveAfterEveryChangeCheckBox->isChecked());
     config()->set(Config::AutoSaveOnExit, m_generalUi->autoSaveOnExitCheckBox->isChecked());
+    config()->set(Config::AutoSaveNonDataChanges, m_generalUi->autoSaveNonDataChangesCheckBox->isChecked());
     config()->set(Config::BackupBeforeSave, m_generalUi->backupBeforeSaveCheckBox->isChecked());
     config()->set(Config::UseAtomicSaves, m_generalUi->useAtomicSavesCheckBox->isChecked());
     config()->set(Config::AutoReloadOnChange, m_generalUi->autoReloadOnChangeCheckBox->isChecked());
@@ -318,24 +328,27 @@ void ApplicationSettingsWidget::saveSettings()
     config()->set(Config::MinimizeOnCopy, m_generalUi->minimizeOnCopyRadioButton->isChecked());
     config()->set(Config::DropToBackgroundOnCopy, m_generalUi->dropToBackgroundOnCopyRadioButton->isChecked());
     config()->set(Config::UseGroupIconOnEntryCreation, m_generalUi->useGroupIconOnEntryCreationCheckBox->isChecked());
-    config()->set(Config::IgnoreGroupExpansion, m_generalUi->ignoreGroupExpansionCheckBox->isChecked());
     config()->set(Config::AutoTypeEntryTitleMatch, m_generalUi->autoTypeEntryTitleMatchCheckBox->isChecked());
     config()->set(Config::AutoTypeEntryURLMatch, m_generalUi->autoTypeEntryURLMatchCheckBox->isChecked());
+    config()->set(Config::AutoTypeHideExpiredEntry, m_generalUi->autoTypeHideExpiredEntryCheckBox->isChecked());
     config()->set(Config::FaviconDownloadTimeout, m_generalUi->faviconTimeoutSpinBox->value());
 
-    config()->set(Config::GUI_Language, m_generalUi->languageComboBox->currentData().toString());
-    config()->set(Config::GUI_HidePreviewPanel, m_generalUi->previewHideCheckBox->isChecked());
-    config()->set(Config::GUI_HideToolbar, m_generalUi->toolbarHideCheckBox->isChecked());
+    auto language = m_generalUi->languageComboBox->currentData().toString();
+    if (config()->get(Config::GUI_Language) != language) {
+        QTimer::singleShot(200, [] {
+            getMainWindow()->restartApp(
+                tr("You must restart the application to set the new language. Would you like to restart now?"));
+        });
+    }
+    config()->set(Config::GUI_Language, language);
+
     config()->set(Config::GUI_MovableToolbar, m_generalUi->toolbarMovableCheckBox->isChecked());
     config()->set(Config::GUI_MonospaceNotes, m_generalUi->monospaceNotesCheckBox->isChecked());
-
-    QString theme = m_generalUi->appThemeSelection->currentData().toString();
-    config()->set(Config::GUI_ApplicationTheme, theme);
 
     config()->set(Config::GUI_ToolButtonStyle, m_generalUi->toolButtonStyleComboBox->currentData().toString());
 
     config()->set(Config::GUI_ShowTrayIcon, m_generalUi->systrayShowCheckBox->isChecked());
-    config()->set(Config::GUI_DarkTrayIcon, m_generalUi->systrayDarkIconCheckBox->isChecked());
+    config()->set(Config::GUI_TrayIconAppearance, m_generalUi->trayIconAppearance->currentData().toString());
     config()->set(Config::GUI_MinimizeToTray, m_generalUi->systrayMinimizeToTrayCheckBox->isChecked());
     config()->set(Config::GUI_MinimizeOnClose, m_generalUi->minimizeOnCloseCheckBox->isChecked());
     config()->set(Config::GUI_MinimizeOnStartup, m_generalUi->systrayMinimizeOnStartup->isChecked());
@@ -366,12 +379,14 @@ void ApplicationSettingsWidget::saveSettings()
     config()->set(Config::Security_RelockAutoType, m_secUi->relockDatabaseAutoTypeCheckBox->isChecked());
     config()->set(Config::Security_IconDownloadFallback, m_secUi->fallbackToSearch->isChecked());
 
-    config()->set(Config::Security_PasswordsCleartext, m_secUi->passwordCleartextCheckBox->isChecked());
-    config()->set(Config::Security_PasswordEmptyNoDots, m_secUi->passwordShowDotsCheckBox->isChecked());
+    config()->set(Config::Security_PasswordsHidden, m_secUi->passwordsHiddenCheckBox->isChecked());
+    config()->set(Config::Security_PasswordEmptyPlaceholder, m_secUi->passwordShowDotsCheckBox->isChecked());
 
     config()->set(Config::Security_HidePasswordPreviewPanel, m_secUi->passwordPreviewCleartextCheckBox->isChecked());
-    config()->set(Config::Security_PasswordsRepeat, m_secUi->passwordRepeatCheckBox->isChecked());
+    config()->set(Config::Security_PasswordsRepeatVisible, m_secUi->passwordsRepeatVisibleCheckBox->isChecked());
     config()->set(Config::Security_HideNotes, m_secUi->hideNotesCheckBox->isChecked());
+    config()->set(Config::Security_NoConfirmMoveEntryToRecycleBin,
+                  m_secUi->NoConfirmMoveEntryToRecycleBinCheckBox->isChecked());
 
     config()->set(Config::Security_ResetTouchId, m_secUi->touchIDResetCheckBox->isChecked());
     config()->set(Config::Security_ResetTouchIdTimeout, m_secUi->touchIDResetSpinBox->value());
@@ -380,13 +395,13 @@ void ApplicationSettingsWidget::saveSettings()
     // Security: clear storage if related settings are disabled
     if (!config()->get(Config::RememberLastDatabases).toBool()) {
         config()->remove(Config::LastDatabases);
-        config()->remove(Config::OpenPreviousDatabasesOnStartup);
         config()->remove(Config::LastActiveDatabase);
         config()->remove(Config::LastAttachmentDir);
     }
 
     if (!config()->get(Config::RememberLastKeyFiles).toBool()) {
         config()->remove(Config::LastKeyFiles);
+        config()->remove(Config::LastChallengeResponse);
         config()->remove(Config::LastDir);
     }
 
@@ -419,7 +434,6 @@ void ApplicationSettingsWidget::resetSettings()
 
     // Clear recently used data
     config()->remove(Config::LastDatabases);
-    config()->remove(Config::OpenPreviousDatabasesOnStartup);
     config()->remove(Config::LastActiveDatabase);
     config()->remove(Config::LastAttachmentDir);
     config()->remove(Config::LastKeyFiles);
@@ -447,11 +461,13 @@ void ApplicationSettingsWidget::reject()
 
 void ApplicationSettingsWidget::autoSaveToggled(bool checked)
 {
-    // Explicitly enable auto-save on exit if it wasn't already
-    if (checked && !m_generalUi->autoSaveOnExitCheckBox->isChecked()) {
+    // Explicitly enable other auto-save options
+    if (checked) {
         m_generalUi->autoSaveOnExitCheckBox->setChecked(true);
+        m_generalUi->autoSaveNonDataChangesCheckBox->setChecked(true);
     }
     m_generalUi->autoSaveOnExitCheckBox->setEnabled(!checked);
+    m_generalUi->autoSaveNonDataChangesCheckBox->setEnabled(!checked);
 }
 
 void ApplicationSettingsWidget::hideWindowOnCopyCheckBoxToggled(bool checked)
@@ -462,15 +478,9 @@ void ApplicationSettingsWidget::hideWindowOnCopyCheckBoxToggled(bool checked)
 
 void ApplicationSettingsWidget::systrayToggled(bool checked)
 {
-    m_generalUi->systrayDarkIconCheckBox->setEnabled(checked);
+    m_generalUi->trayIconAppearance->setEnabled(checked);
+    m_generalUi->trayIconAppearanceLabel->setEnabled(checked);
     m_generalUi->systrayMinimizeToTrayCheckBox->setEnabled(checked);
-}
-
-void ApplicationSettingsWidget::toolbarSettingsToggled(bool checked)
-{
-    m_generalUi->toolbarMovableCheckBox->setEnabled(!checked);
-    m_generalUi->toolButtonStyleComboBox->setEnabled(!checked);
-    m_generalUi->toolButtonStyleLabel->setEnabled(!checked);
 }
 
 void ApplicationSettingsWidget::rememberDatabasesToggled(bool checked)

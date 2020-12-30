@@ -26,10 +26,11 @@
 #include "core/Entry.h"
 #include "core/EntryAttributes.h"
 #include "core/Group.h"
-#include "core/Tools.h"
+#include "core/Metadata.h"
 
 #include <QMimeDatabase>
 #include <QRegularExpression>
+#include <QScopedPointer>
 #include <QSet>
 #include <QTextCodec>
 
@@ -47,16 +48,34 @@ namespace FdoSecrets
         constexpr auto FDO_SECRETS_CONTENT_TYPE = "FDO_SECRETS_CONTENT_TYPE";
     } // namespace
 
+    Item* Item::Create(Collection* parent, Entry* backend)
+    {
+        QScopedPointer<Item> res{new Item(parent, backend)};
+
+        if (!res->registerSelf()) {
+            return nullptr;
+        }
+
+        return res.take();
+    }
+
     Item::Item(Collection* parent, Entry* backend)
-        : DBusObject(parent)
+        : DBusObjectHelper(parent)
         , m_backend(backend)
     {
         Q_ASSERT(!p()->objectPath().path().isEmpty());
 
-        registerWithPath(QStringLiteral(DBUS_PATH_TEMPLATE_ITEM).arg(p()->objectPath().path(), m_backend->uuidToHex()),
-                         new ItemAdaptor(this));
-
         connect(m_backend.data(), &Entry::entryModified, this, &Item::itemChanged);
+    }
+
+    bool Item::registerSelf()
+    {
+        auto path = QStringLiteral(DBUS_PATH_TEMPLATE_ITEM).arg(p()->objectPath().path(), m_backend->uuidToHex());
+        bool ok = registerWithPath(path);
+        if (!ok) {
+            service()->plugin()->emitError(tr("Failed to register item on DBus at path '%1'").arg(path));
+        }
+        return ok;
     }
 
     DBusReturn<bool> Item::locked() const
@@ -205,8 +224,8 @@ namespace FdoSecrets
         if (ret.isError()) {
             return ret;
         }
-        auto prompt = new DeleteItemPrompt(service(), this);
-        return prompt;
+        auto prompt = DeleteItemPrompt::Create(service(), this);
+        return prompt.value();
     }
 
     DBusReturn<SecretStruct> Item::getSecret(Session* session)
@@ -274,8 +293,8 @@ namespace FdoSecrets
             return ret;
         }
 
-        auto attributes = qdbus_cast<StringStringMap>(
-            properties.value(QStringLiteral(DBUS_INTERFACE_SECRET_ITEM ".Attributes")).value<QDBusArgument>());
+        auto attributes =
+            properties.value(QStringLiteral(DBUS_INTERFACE_SECRET_ITEM ".Attributes")).value<StringStringMap>();
         ret = setAttributes(attributes);
         if (ret.isError()) {
             return ret;
@@ -321,7 +340,7 @@ namespace FdoSecrets
         // Unregister current path early, do not rely on deleteLater's call to destructor
         // as in case of Entry moving between groups, new Item will be created at the same DBus path
         // before the current Item is deleted in the event loop.
-        unregisterCurrentPath();
+        unregisterPrimaryPath();
 
         m_backend = nullptr;
         deleteLater();
@@ -350,6 +369,13 @@ namespace FdoSecrets
         return pathComponents.join('/');
     }
 
+    bool Item::isDeletePermanent() const
+    {
+        auto recycleBin = backend()->database()->metadata()->recycleBin();
+        return (recycleBin && recycleBin->findEntryByUuid(backend()->uuid()))
+               || !backend()->database()->metadata()->recycleBinEnabled();
+    }
+
     void setEntrySecret(Entry* entry, const QByteArray& data, const QString& contentType)
     {
         auto mimeName = contentType.split(';').takeFirst().trimmed();
@@ -369,7 +395,8 @@ namespace FdoSecrets
         }
 
         if (!mimeType.isValid() || !mimeType.inherits(QStringLiteral("text/plain")) || !codec) {
-            // we can't handle this content type, save the data as attachment
+            // we can't handle this content type, save the data as attachment, and clear the password field
+            entry->setPassword("");
             entry->attachments()->set(FDO_SECRETS_DATA, data);
             entry->attributes()->set(FDO_SECRETS_CONTENT_TYPE, contentType);
             return;
@@ -393,8 +420,13 @@ namespace FdoSecrets
 
         if (entry->attachments()->hasKey(FDO_SECRETS_DATA)) {
             ss.value = entry->attachments()->value(FDO_SECRETS_DATA);
-            Q_ASSERT(entry->attributes()->hasKey(FDO_SECRETS_CONTENT_TYPE));
-            ss.contentType = entry->attributes()->value(FDO_SECRETS_CONTENT_TYPE);
+            if (entry->attributes()->hasKey(FDO_SECRETS_CONTENT_TYPE)) {
+                ss.contentType = entry->attributes()->value(FDO_SECRETS_CONTENT_TYPE);
+            } else {
+                // the entry is somehow corrupted, maybe the user deleted it.
+                // set to binary and hope for the best...
+                ss.contentType = QStringLiteral("application/octet-stream");
+            }
             return ss;
         }
 

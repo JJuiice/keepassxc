@@ -13,6 +13,12 @@
     <height>600</height>
    </rect>
   </property>
+  <property name="minimumSize">
+   <size>
+    <width>800</width>
+    <height>0</height>
+   </size>
+  </property>
   <property name="windowTitle">
    <string notr="true">KeePassXC</string>
   </property>
@@ -37,28 +43,13 @@
      <number>0</number>
     </property>
     <item>
-     <widget class="QWidget" name="globalMessageWidgetContainer" native="true">
-      <layout class="QVBoxLayout" name="globalMessageWidgetLayout">
-       <property name="spacing">
-        <number>0</number>
-       </property>
-       <property name="bottomMargin">
-        <number>0</number>
-       </property>
-       <item>
-        <widget class="MessageWidget" name="globalMessageWidget" native="true">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="styleSheet">
-          <string notr="true">MessageWidget {margin: 90px}</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
+     <widget class="MessageWidget" name="globalMessageWidget" native="true">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
      </widget>
     </item>
     <item>
@@ -78,9 +69,6 @@
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
-      </property>
-      <property name="focusPolicy">
-       <enum>Qt::TabFocus</enum>
       </property>
       <property name="currentIndex">
        <number>2</number>
@@ -129,11 +117,7 @@
          <number>0</number>
         </property>
         <item>
-         <widget class="ApplicationSettingsWidget" name="settingsWidget" native="true">
-          <property name="focusPolicy">
-           <enum>Qt::TabFocus</enum>
-          </property>
-         </widget>
+         <widget class="ApplicationSettingsWidget" name="settingsWidget" native="true"/>
         </item>
        </layout>
       </widget>
@@ -158,11 +142,7 @@
            </spacer>
           </item>
           <item>
-           <widget class="WelcomeWidget" name="welcomeWidget" native="true">
-            <property name="focusPolicy">
-             <enum>Qt::TabFocus</enum>
-            </property>
-           </widget>
+           <widget class="WelcomeWidget" name="welcomeWidget" native="true"/>
           </item>
           <item>
            <spacer name="horizontalSpacer_2">
@@ -209,11 +189,7 @@
          </spacer>
         </item>
         <item>
-         <widget class="PasswordGeneratorWidget" name="passwordGeneratorWidget" native="true">
-          <property name="focusPolicy">
-           <enum>Qt::TabFocus</enum>
-          </property>
-         </widget>
+         <widget class="PasswordGeneratorWidget" name="passwordGeneratorWidget" native="true"/>
         </item>
         <item>
          <spacer name="verticalSpacer">
@@ -240,11 +216,8 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>24</height>
+     <height>22</height>
     </rect>
-   </property>
-   <property name="focusPolicy">
-    <enum>Qt::NoFocus</enum>
    </property>
    <property name="contextMenuPolicy">
     <enum>Qt::PreventContextMenu</enum>
@@ -262,9 +235,9 @@
      <property name="title">
       <string>&amp;Import</string>
      </property>
-     <addaction name="actionImportKeePass1"/>
-     <addaction name="actionImportOpVault"/>
      <addaction name="actionImportCsv"/>
+     <addaction name="actionImportOpVault"/>
+     <addaction name="actionImportKeePass1"/>
     </widget>
     <widget class="QMenu" name="menuExport">
      <property name="title">
@@ -278,11 +251,12 @@
     <addaction name="menuRecentDatabases"/>
     <addaction name="actionDatabaseSave"/>
     <addaction name="actionDatabaseSaveAs"/>
+    <addaction name="actionDatabaseSaveBackup"/>
     <addaction name="actionDatabaseClose"/>
     <addaction name="separator"/>
-    <addaction name="actionChangeMasterKey"/>
     <addaction name="actionReports"/>
-    <addaction name="actionChangeDatabaseSettings"/>
+    <addaction name="actionDatabaseSettings"/>
+    <addaction name="actionDatabaseSecurity"/>
     <addaction name="separator"/>
     <addaction name="actionDatabaseMerge"/>
     <addaction name="menuImport"/>
@@ -336,10 +310,25 @@
      <addaction name="actionEntryTotpQRCode"/>
      <addaction name="actionEntrySetupTotp"/>
     </widget>
+    <widget class="QMenu" name="menuEntryAutoTypeWithSequence">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="title">
+      <string>Perform Auto-Type Sequence</string>
+     </property>
+     <addaction name="actionEntryAutoTypeUsername"/>
+     <addaction name="actionEntryAutoTypeUsernameEnter"/>
+     <addaction name="actionEntryAutoTypePassword"/>
+     <addaction name="actionEntryAutoTypePasswordEnter"/>
+    </widget>
     <addaction name="actionEntryNew"/>
     <addaction name="actionEntryEdit"/>
     <addaction name="actionEntryClone"/>
     <addaction name="actionEntryDelete"/>
+    <addaction name="separator"/>
+    <addaction name="actionEntryMoveUp"/>
+    <addaction name="actionEntryMoveDown"/>
     <addaction name="separator"/>
     <addaction name="actionEntryCopyUsername"/>
     <addaction name="actionEntryCopyPassword"/>
@@ -347,6 +336,7 @@
     <addaction name="menuEntryTotp"/>
     <addaction name="separator"/>
     <addaction name="actionEntryAutoType"/>
+    <addaction name="menuEntryAutoTypeWithSequence"/>
     <addaction name="separator"/>
     <addaction name="actionEntryOpenUrl"/>
     <addaction name="actionEntryDownloadIcon"/>
@@ -376,16 +366,36 @@
     <addaction name="actionPasswordGenerator"/>
     <addaction name="actionSettings"/>
    </widget>
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>View</string>
+    </property>
+    <widget class="QMenu" name="menuTheme">
+     <property name="title">
+      <string>Theme</string>
+     </property>
+     <addaction name="actionThemeAuto"/>
+     <addaction name="actionThemeLight"/>
+     <addaction name="actionThemeDark"/>
+     <addaction name="actionThemeClassic"/>
+    </widget>
+    <addaction name="menuTheme"/>
+    <addaction name="actionCompactMode"/>
+    <addaction name="actionAlwaysOnTop"/>
+    <addaction name="actionShowGroupsPanel"/>
+    <addaction name="actionShowPreviewPanel"/>
+    <addaction name="actionShowToolbar"/>
+    <addaction name="actionHideUsernames"/>
+    <addaction name="actionHidePasswords"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEntries"/>
    <addaction name="menuGroups"/>
    <addaction name="menuTools"/>
+   <addaction name="menuView"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QToolBar" name="toolBar">
-   <property name="focusPolicy">
-    <enum>Qt::NoFocus</enum>
-   </property>
    <property name="contextMenuPolicy">
     <enum>Qt::PreventContextMenu</enum>
    </property>
@@ -416,9 +426,9 @@
    <addaction name="actionEntryCopyURL"/>
    <addaction name="actionEntryAutoType"/>
    <addaction name="separator"/>
-   <addaction name="actionPasswordGenerator"/>
    <addaction name="actionLockDatabases"/>
    <addaction name="separator"/>
+   <addaction name="actionPasswordGenerator"/>
    <addaction name="actionSettings"/>
    <addaction name="separator"/>
   </widget>
@@ -572,12 +582,12 @@
     <string>Sa&amp;ve Database As…</string>
    </property>
   </action>
-  <action name="actionChangeMasterKey">
+  <action name="actionDatabaseSecurity">
    <property name="enabled">
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Change Master &amp;Key…</string>
+    <string>Database &amp;Security…</string>
    </property>
   </action>
   <action name="actionReports">
@@ -585,7 +595,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>&amp;Reports...</string>
+    <string>Database &amp;Reports...</string>
    </property>
    <property name="toolTip">
     <string>Statistics, health check, etc.</string>
@@ -594,7 +604,7 @@
     <enum>QAction::NoRole</enum>
    </property>
   </action>
-  <action name="actionChangeDatabaseSettings">
+  <action name="actionDatabaseSettings">
    <property name="enabled">
     <bool>false</bool>
    </property>
@@ -614,6 +624,28 @@
    </property>
    <property name="text">
     <string>&amp;Clone Entry…</string>
+   </property>
+  </action>
+  <action name="actionEntryMoveUp">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Move u&amp;p</string>
+   </property>
+   <property name="toolTip">
+    <string>Move entry one step up</string>
+   </property>
+  </action>
+  <action name="actionEntryMoveDown">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Move do&amp;wn</string>
+   </property>
+   <property name="toolTip">
+    <string>Move entry one step down</string>
    </property>
   </action>
   <action name="actionEntryCopyUsername">
@@ -663,6 +695,38 @@
    </property>
    <property name="text">
     <string>Perform &amp;Auto-Type</string>
+   </property>
+  </action>
+  <action name="actionEntryAutoTypeUsername">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>{USERNAME}</string>
+   </property>
+  </action>
+  <action name="actionEntryAutoTypeUsernameEnter">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>{USERNAME}{ENTER}</string>
+   </property>
+  </action>
+  <action name="actionEntryAutoTypePassword">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>{PASSWORD}</string>
+   </property>
+  </action>
+  <action name="actionEntryAutoTypePasswordEnter">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>{PASSWORD}{ENTER}</string>
    </property>
   </action>
   <action name="actionEntryDownloadIcon">
@@ -724,7 +788,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>&amp;Export to CSV File…</string>
+    <string>&amp;CSV File…</string>
    </property>
   </action>
   <action name="actionExportHtml">
@@ -732,7 +796,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>&amp;Export to HTML File…</string>
+    <string>&amp;HTML File…</string>
    </property>
   </action>
   <action name="actionImportKeePass1">
@@ -802,7 +866,7 @@
     <string>&amp;Getting Started</string>
    </property>
    <property name="toolTip">
-    <string>Open Getting Started Guide PDF</string>
+    <string>Open Getting Started Guide</string>
    </property>
   </action>
   <action name="actionOnlineHelp">
@@ -810,7 +874,7 @@
     <string>&amp;Online Help</string>
    </property>
    <property name="toolTip">
-    <string>Go to online documentation (opens browser)</string>
+    <string>Go to online documentation</string>
    </property>
   </action>
   <action name="actionUserGuide">
@@ -818,7 +882,7 @@
     <string>&amp;User Guide</string>
    </property>
    <property name="toolTip">
-    <string>Open User Guide PDF</string>
+    <string>Open User Guide</string>
    </property>
   </action>
   <action name="actionKeyboardShortcuts">
@@ -829,6 +893,14 @@
     <string notr="true">Ctrl+/</string>
    </property>
   </action>
+  <action name="actionDatabaseSaveBackup">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Save Database Backup...</string>
+   </property>
+  </action>
   <action name="actionEntryAddToAgent">
    <property name="text">
     <string>Add key to SSH Agent</string>
@@ -837,6 +909,118 @@
   <action name="actionEntryRemoveFromAgent">
    <property name="text">
     <string>Remove key from SSH Agent</string>
+   </property>
+  </action>
+  <action name="actionCompactMode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Compact Mode</string>
+   </property>
+  </action>
+  <action name="actionThemeAuto">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Automatic</string>
+   </property>
+  </action>
+  <action name="actionThemeLight">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Light</string>
+   </property>
+  </action>
+  <action name="actionThemeDark">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Dark</string>
+   </property>
+  </action>
+  <action name="actionThemeClassic">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Classic (Platform-native)</string>
+   </property>
+  </action>
+  <action name="actionShowToolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Toolbar</string>
+   </property>
+  </action>
+  <action name="actionShowGroupsPanel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Groups Panel</string>
+   </property>
+  </action>
+  <action name="actionShowPreviewPanel">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Preview Panel</string>
+   </property>
+  </action>
+  <action name="actionAlwaysOnTop">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Always on Top</string>
+   </property>
+   <property name="shortcut">
+    <string notr="true">Ctrl+Shift+A</string>
+   </property>
+  </action>
+  <action name="actionHideUsernames">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Hide Usernames</string>
+   </property>
+   <property name="shortcut">
+    <string notr="true">Ctrl+Shift+B</string>
+   </property>
+  </action>
+  <action name="actionHidePasswords">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Hide Passwords</string>
+   </property>
+   <property name="shortcut">
+    <string notr="true">Ctrl+Shift+C</string>
    </property>
   </action>
  </widget>

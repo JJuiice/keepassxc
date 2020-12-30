@@ -42,6 +42,7 @@ public:
         AutoSaveAfterEveryChange,
         AutoReloadOnChange,
         AutoSaveOnExit,
+        AutoSaveNonDataChanges,
         BackupBeforeSave,
         UseAtomicSaves,
         SearchLimitGroup,
@@ -55,9 +56,9 @@ public:
         AutoTypeEntryURLMatch,
         AutoTypeDelay,
         AutoTypeStartDelay,
+        AutoTypeHideExpiredEntry,
         GlobalAutoTypeKey,
         GlobalAutoTypeModifiers,
-        IgnoreGroupExpansion,
         FaviconDownloadTimeout,
         UpdateCheckMessageShown,
         UseTouchID,
@@ -73,10 +74,11 @@ public:
         GUI_Language,
         GUI_HideToolbar,
         GUI_MovableToolbar,
+        GUI_HideGroupsPanel,
         GUI_HidePreviewPanel,
         GUI_ToolButtonStyle,
         GUI_ShowTrayIcon,
-        GUI_DarkTrayIcon,
+        GUI_TrayIconAppearance,
         GUI_MinimizeToTray,
         GUI_MinimizeOnStartup,
         GUI_MinimizeOnClose,
@@ -85,6 +87,7 @@ public:
         GUI_AdvancedSettings,
         GUI_MonospaceNotes,
         GUI_ApplicationTheme,
+        GUI_CompactMode,
         GUI_CheckForUpdates,
         GUI_CheckForUpdatesIncludeBetas,
         GUI_EnableColoredPasswords,
@@ -108,15 +111,16 @@ public:
         Security_LockDatabaseMinimize,
         Security_LockDatabaseScreenLock,
         Security_RelockAutoType,
-        Security_PasswordsRepeat,
-        Security_PasswordsCleartext,
-        Security_PasswordEmptyNoDots,
+        Security_PasswordsRepeatVisible,
+        Security_PasswordsHidden,
+        Security_PasswordEmptyPlaceholder,
         Security_HidePasswordPreviewPanel,
         Security_AutoTypeAsk,
         Security_IconDownloadFallback,
         Security_ResetTouchId,
         Security_ResetTouchIdTimeout,
         Security_ResetTouchIdScreenlock,
+        Security_NoConfirmMoveEntryToRecycleBin,
 
         Browser_Enabled,
         Browser_ShowNotification,
@@ -135,6 +139,12 @@ public:
         Browser_SearchInAllDatabases,
         Browser_SupportKphFields,
         Browser_NoMigrationPrompt,
+        Browser_UseCustomBrowser,
+        Browser_CustomBrowserType,
+        Browser_CustomBrowserLocation,
+#ifdef QT_DEBUG
+        Browser_CustomExtensionId,
+#endif
 
         SSHAgent_Enabled,
         SSHAgent_UseOpenSSH,
@@ -177,6 +187,7 @@ public:
 
         Messages_NoLegacyKeyFileWarning,
         Messages_Qt55CompatibilityWarning,
+        Messages_HidePreReleaseWarning,
 
         // Special internal value
         Deleted
@@ -192,17 +203,18 @@ public:
     void resetToDefaults();
 
     static Config* instance();
-    static void createConfigFromFile(const QString& file);
+    static void createConfigFromFile(const QString& configFileName, const QString& localConfigFileName = {});
     static void createTempFileInstance();
 
 signals:
     void changed(ConfigKey key);
 
 private:
-    Config(const QString& fileName, QObject* parent = nullptr);
+    Config(const QString& configFileName, const QString& localConfigFileName, QObject* parent);
     explicit Config(QObject* parent);
-    void init(const QString& configFileName, const QString& localConfigFileName = "");
+    void init(const QString& configFileName, const QString& localConfigFileName);
     void migrate();
+    static QPair<QString, QString> defaultConfigFiles();
 
     static QPointer<Config> m_instance;
 

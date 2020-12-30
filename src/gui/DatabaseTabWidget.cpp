@@ -49,7 +49,7 @@ DatabaseTabWidget::DatabaseTabWidget(QWidget* parent)
     : QTabWidget(parent)
     , m_dbWidgetStateSync(new DatabaseWidgetStateSync(this))
     , m_dbWidgetPendingLock(nullptr)
-    , m_databaseOpenDialog(new DatabaseOpenDialog())
+    , m_databaseOpenDialog(new DatabaseOpenDialog(this))
 {
     auto* tabBar = new DragTabBar(this);
     setTabBar(tabBar);
@@ -275,7 +275,11 @@ void DatabaseTabWidget::importKeePass1Database()
 
 void DatabaseTabWidget::importOpVaultDatabase()
 {
-    QString fileName = fileDialog()->getExistingDirectory(this, "Open .opvault database");
+#ifdef Q_OS_MACOS
+    QString fileName = fileDialog()->getOpenFileName(this, tr("Open OPVault"), {}, "OPVault (*.opvault)");
+#else
+    QString fileName = fileDialog()->getExistingDirectory(this, tr("Open OPVault"));
+#endif
 
     if (fileName.isEmpty()) {
         return;
@@ -389,6 +393,20 @@ bool DatabaseTabWidget::saveDatabaseAs(int index)
     return ok;
 }
 
+bool DatabaseTabWidget::saveDatabaseBackup(int index)
+{
+    if (index == -1) {
+        index = currentIndex();
+    }
+
+    auto* dbWidget = databaseWidgetFromIndex(index);
+    bool ok = dbWidget->saveBackup();
+    if (ok) {
+        updateLastDatabases(dbWidget->database()->filePath());
+    }
+    return ok;
+}
+
 void DatabaseTabWidget::closeDatabaseFromSender()
 {
     auto* dbWidget = qobject_cast<DatabaseWidget*>(sender());
@@ -458,17 +476,17 @@ bool DatabaseTabWidget::warnOnExport()
     return ans == MessageBox::Yes;
 }
 
-void DatabaseTabWidget::changeMasterKey()
+void DatabaseTabWidget::showDatabaseSecurity()
 {
-    currentDatabaseWidget()->switchToMasterKeyChange();
+    currentDatabaseWidget()->switchToDatabaseSecurity();
 }
 
-void DatabaseTabWidget::changeReports()
+void DatabaseTabWidget::showDatabaseReports()
 {
-    currentDatabaseWidget()->switchToReports();
+    currentDatabaseWidget()->switchToDatabaseReports();
 }
 
-void DatabaseTabWidget::changeDatabaseSettings()
+void DatabaseTabWidget::showDatabaseSettings()
 {
     currentDatabaseWidget()->switchToDatabaseSettings();
 }
@@ -609,7 +627,8 @@ DatabaseWidget* DatabaseTabWidget::currentDatabaseWidget()
 bool DatabaseTabWidget::lockDatabases()
 {
     int numLocked = 0;
-    for (int i = 0, c = count(); i < c; ++i) {
+    int c = count();
+    for (int i = 0; i < c; ++i) {
         auto dbWidget = databaseWidgetFromIndex(i);
         if (dbWidget->lock()) {
             ++numLocked;
@@ -620,7 +639,7 @@ bool DatabaseTabWidget::lockDatabases()
         }
     }
 
-    return numLocked == count();
+    return numLocked == c;
 }
 
 /**
@@ -735,5 +754,13 @@ void DatabaseTabWidget::performGlobalAutoType()
             m_dbWidgetPendingLock = currentDatabaseWidget();
         }
         unlockDatabaseInDialog(currentDatabaseWidget(), DatabaseOpenDialog::Intent::AutoType);
+    }
+}
+
+void DatabaseTabWidget::performBrowserUnlock()
+{
+    auto dbWidget = currentDatabaseWidget();
+    if (dbWidget && dbWidget->isLocked()) {
+        unlockDatabaseInDialog(dbWidget, DatabaseOpenDialog::Intent::Browser);
     }
 }

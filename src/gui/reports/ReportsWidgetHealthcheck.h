@@ -28,6 +28,7 @@ class Database;
 class Entry;
 class Group;
 class PasswordHealth;
+class QSortFilterProxyModel;
 class QStandardItemModel;
 
 namespace Ui
@@ -54,17 +55,22 @@ signals:
 public slots:
     void calculateHealth();
     void emitEntryActivated(const QModelIndex& index);
+    void customMenuRequested(QPoint);
+    void editFromContextmenu();
+    void toggleKnownBad(bool);
 
 private:
-    void addHealthRow(QSharedPointer<PasswordHealth>, const Group*, const Entry*);
+    void addHealthRow(QSharedPointer<PasswordHealth>, const Group*, const Entry*, bool knownBad);
 
     QScopedPointer<Ui::ReportsWidgetHealthcheck> m_ui;
 
     bool m_healthCalculated = false;
     QIcon m_errorIcon;
     QScopedPointer<QStandardItemModel> m_referencesModel;
+    QScopedPointer<QSortFilterProxyModel> m_modelProxy;
     QSharedPointer<Database> m_db;
     QList<QPair<const Group*, const Entry*>> m_rowToEntry;
+    Entry* m_contextmenuEntry = nullptr;
 };
 
 #endif // KEEPASSXC_REPORTSWIDGETHEALTHCHECK_H

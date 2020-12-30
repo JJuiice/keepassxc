@@ -45,8 +45,10 @@ public:
         Password = 0,
         Diceware = 1
     };
+
     explicit PasswordGeneratorWidget(QWidget* parent = nullptr);
     ~PasswordGeneratorWidget();
+
     void loadSettings();
     void saveSettings();
     void setPasswordLength(int length);
@@ -64,12 +66,12 @@ public slots:
 
 signals:
     void appliedPassword(const QString& password);
-    void closePasswordGenerator();
+    void closed();
 
 private slots:
     void updateButtonsEnabled(const QString& password);
     void updatePasswordStrength(const QString& password);
-    void setAdvancedMode(bool state);
+    void setAdvancedMode(bool advanced);
     void excludeHexChars();
 
     void passwordLengthChanged(int length);
@@ -87,9 +89,6 @@ private:
     const QScopedPointer<PasswordGenerator> m_passwordGenerator;
     const QScopedPointer<PassphraseGenerator> m_dicewareGenerator;
     const QScopedPointer<Ui::PasswordGeneratorWidget> m_ui;
-
-protected:
-    void keyPressEvent(QKeyEvent* e) override;
 };
 
 #endif // KEEPASSX_PASSWORDGENERATORWIDGET_H

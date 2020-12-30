@@ -17,6 +17,7 @@
 
 #include "Prompt.h"
 
+#include "fdosecrets/FdoSecretsPlugin.h"
 #include "fdosecrets/FdoSecretsSettings.h"
 #include "fdosecrets/objects/Collection.h"
 #include "fdosecrets/objects/Item.h"
@@ -33,13 +34,20 @@ namespace FdoSecrets
 {
 
     PromptBase::PromptBase(Service* parent)
-        : DBusObject(parent)
+        : DBusObjectHelper(parent)
     {
-        registerWithPath(
-            QStringLiteral("%1/prompt/%2").arg(p()->objectPath().path(), Tools::uuidToHex(QUuid::createUuid())),
-            new PromptAdaptor(this));
-
         connect(this, &PromptBase::completed, this, &PromptBase::deleteLater);
+    }
+
+    bool PromptBase::registerSelf()
+    {
+        auto path = QStringLiteral(DBUS_PATH_TEMPLATE_PROMPT)
+                        .arg(p()->objectPath().path(), Tools::uuidToHex(QUuid::createUuid()));
+        bool ok = registerWithPath(path);
+        if (!ok) {
+            service()->plugin()->emitError(tr("Failed to register item on DBus at path '%1'").arg(path));
+        }
+        return ok;
     }
 
     QWindow* PromptBase::findWindow(const QString& windowId)
@@ -65,8 +73,17 @@ namespace FdoSecrets
 
     DBusReturn<void> PromptBase::dismiss()
     {
-        emit completed(true, {});
+        emit completed(true, "");
         return {};
+    }
+
+    DBusReturn<DeleteCollectionPrompt*> DeleteCollectionPrompt::Create(Service* parent, Collection* coll)
+    {
+        QScopedPointer<DeleteCollectionPrompt> res{new DeleteCollectionPrompt(parent, coll)};
+        if (!res->registerSelf()) {
+            return DBusReturn<>::Error(QDBusError::InvalidObjectPath);
+        }
+        return res.take();
     }
 
     DeleteCollectionPrompt::DeleteCollectionPrompt(Service* parent, Collection* coll)
@@ -95,9 +112,18 @@ namespace FdoSecrets
         // only need to delete in backend, collection will react itself.
         auto accepted = service()->doCloseDatabase(m_collection->backend());
 
-        emit completed(!accepted, {});
+        emit completed(!accepted, "");
 
         return {};
+    }
+
+    DBusReturn<CreateCollectionPrompt*> CreateCollectionPrompt::Create(Service* parent)
+    {
+        QScopedPointer<CreateCollectionPrompt> res{new CreateCollectionPrompt(parent)};
+        if (!res->registerSelf()) {
+            return DBusReturn<>::Error(QDBusError::InvalidObjectPath);
+        }
+        return res.take();
     }
 
     CreateCollectionPrompt::CreateCollectionPrompt(Service* parent)
@@ -125,9 +151,24 @@ namespace FdoSecrets
         }
 
         emit collectionCreated(coll);
-        emit completed(false, coll->objectPath().path());
+        emit completed(false, QVariant::fromValue(coll->objectPath()));
 
         return {};
+    }
+
+    DBusReturn<void> CreateCollectionPrompt::dismiss()
+    {
+        emit completed(true, QVariant::fromValue(QDBusObjectPath{"/"}));
+        return {};
+    }
+
+    DBusReturn<LockCollectionsPrompt*> LockCollectionsPrompt::Create(Service* parent, const QList<Collection*>& colls)
+    {
+        QScopedPointer<LockCollectionsPrompt> res{new LockCollectionsPrompt(parent, colls)};
+        if (!res->registerSelf()) {
+            return DBusReturn<>::Error(QDBusError::InvalidObjectPath);
+        }
+        return res.take();
     }
 
     LockCollectionsPrompt::LockCollectionsPrompt(Service* parent, const QList<Collection*>& colls)
@@ -153,17 +194,34 @@ namespace FdoSecrets
 
         MessageBox::OverrideParent override(findWindow(windowId));
 
-        QList<QDBusObjectPath> locked;
         for (const auto& c : asConst(m_collections)) {
             if (c) {
-                c->doLock();
-                locked << c->objectPath();
+                if (!c->doLock()) {
+                    return dismiss();
+                }
+                m_locked << c->objectPath();
             }
         }
 
-        emit completed(false, QVariant::fromValue(locked));
+        emit completed(false, QVariant::fromValue(m_locked));
 
         return {};
+    }
+
+    DBusReturn<void> LockCollectionsPrompt::dismiss()
+    {
+        emit completed(true, QVariant::fromValue(m_locked));
+        return {};
+    }
+
+    DBusReturn<UnlockCollectionsPrompt*> UnlockCollectionsPrompt::Create(Service* parent,
+                                                                         const QList<Collection*>& coll)
+    {
+        QScopedPointer<UnlockCollectionsPrompt> res{new UnlockCollectionsPrompt(parent, coll)};
+        if (!res->registerSelf()) {
+            return DBusReturn<>::Error(QDBusError::InvalidObjectPath);
+        }
+        return res.take();
     }
 
     UnlockCollectionsPrompt::UnlockCollectionsPrompt(Service* parent, const QList<Collection*>& colls)
@@ -191,6 +249,7 @@ namespace FdoSecrets
 
         for (const auto& c : asConst(m_collections)) {
             if (c) {
+                // doUnlock is nonblocking
                 connect(c, &Collection::doneUnlockCollection, this, &UnlockCollectionsPrompt::collectionUnlockFinished);
                 c->doUnlock();
             }
@@ -226,6 +285,20 @@ namespace FdoSecrets
             emit completed(m_unlocked.isEmpty(), QVariant::fromValue(m_unlocked));
         }
     }
+    DBusReturn<void> UnlockCollectionsPrompt::dismiss()
+    {
+        emit completed(true, QVariant::fromValue(m_unlocked));
+        return {};
+    }
+
+    DBusReturn<DeleteItemPrompt*> DeleteItemPrompt::Create(Service* parent, Item* item)
+    {
+        QScopedPointer<DeleteItemPrompt> res{new DeleteItemPrompt(parent, item)};
+        if (!res->registerSelf()) {
+            return DBusReturn<>::Error(QDBusError::InvalidObjectPath);
+        }
+        return res.take();
+    }
 
     DeleteItemPrompt::DeleteItemPrompt(Service* parent, Item* item)
         : PromptBase(parent)
@@ -250,14 +323,18 @@ namespace FdoSecrets
         // delete item's backend. Item will be notified after the backend is deleted.
         if (m_item) {
             if (FdoSecrets::settings()->noConfirmDeleteItem()) {
-                MessageBox::setNextAnswer(MessageBox::Move);
+                // based on permanent or not, different button is used
+                if (m_item->isDeletePermanent()) {
+                    MessageBox::setNextAnswer(MessageBox::Delete);
+                } else {
+                    MessageBox::setNextAnswer(MessageBox::Move);
+                }
             }
             m_item->collection()->doDeleteEntries({m_item->backend()});
         }
 
-        emit completed(false, {});
+        emit completed(false, "");
 
         return {};
     }
-
 } // namespace FdoSecrets

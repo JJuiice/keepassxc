@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>580</width>
-    <height>410</height>
+    <width>588</width>
+    <height>448</height>
    </rect>
   </property>
   <property name="accessibleName">
@@ -237,7 +237,7 @@
                        <string>Key File:</string>
                       </property>
                       <property name="buddy">
-                       <cstring>comboKeyFile</cstring>
+                       <cstring>keyFileLineEdit</cstring>
                       </property>
                      </widget>
                     </item>
@@ -246,8 +246,11 @@
                       <property name="cursor">
                        <cursorShape>PointingHandCursor</cursorShape>
                       </property>
+                      <property name="focusPolicy">
+                       <enum>Qt::ClickFocus</enum>
+                      </property>
                       <property name="toolTip">
-                       <string>&lt;p&gt;In addition to your master password, you can use a secret file to enhance the security of your database. Such a file can be generated in your database's security settings.&lt;/p&gt;&lt;p&gt;This is &lt;strong&gt;not&lt;/strong&gt; your *.kdbx database file!&lt;br&gt;If you do not have a key file, leave the field empty.&lt;/p&gt;&lt;p&gt;Click for more information...&lt;/p&gt;</string>
+                       <string>&lt;p&gt;In addition to a password, you can use a secret file to enhance the security of your database. This file can be generated in your database's security settings.&lt;/p&gt;&lt;p&gt;This is &lt;strong&gt;not&lt;/strong&gt; your *.kdbx database file!&lt;br&gt;If you do not have a key file, leave this field empty.&lt;/p&gt;&lt;p&gt;Click for more information...&lt;/p&gt;</string>
                       </property>
                       <property name="accessibleName">
                        <string>Key file help</string>
@@ -280,7 +283,7 @@
                      <number>0</number>
                     </property>
                     <item row="1" column="2">
-                     <widget class="QProgressBar" name="yubikeyProgress">
+                     <widget class="QProgressBar" name="hardwareKeyProgress">
                       <property name="maximumSize">
                        <size>
                         <width>16777215</width>
@@ -302,7 +305,7 @@
                      </widget>
                     </item>
                     <item row="0" column="2">
-                     <widget class="QComboBox" name="comboChallengeResponse">
+                     <widget class="QComboBox" name="challengeResponseCombo">
                       <property name="enabled">
                        <bool>false</bool>
                       </property>
@@ -338,7 +341,7 @@
                          <string>Hardware Key:</string>
                         </property>
                         <property name="buddy">
-                         <cstring>comboChallengeResponse</cstring>
+                         <cstring>challengeResponseCombo</cstring>
                         </property>
                        </widget>
                       </item>
@@ -346,6 +349,9 @@
                        <widget class="QToolButton" name="hardwareKeyLabelHelp">
                         <property name="cursor">
                          <cursorShape>PointingHandCursor</cursorShape>
+                        </property>
+                        <property name="focusPolicy">
+                         <enum>Qt::ClickFocus</enum>
                         </property>
                         <property name="toolTip">
                          <string>&lt;p&gt;You can use a hardware security key such as a &lt;strong&gt;YubiKey&lt;/strong&gt; or &lt;strong&gt;OnlyKey&lt;/strong&gt; with slots configured for HMAC-SHA1.&lt;/p&gt;
@@ -400,10 +406,7 @@
                      <number>0</number>
                     </property>
                     <item row="0" column="1">
-                     <widget class="QComboBox" name="comboKeyFile">
-                      <property name="enabled">
-                       <bool>true</bool>
-                      </property>
+                     <widget class="QLineEdit" name="keyFileLineEdit">
                       <property name="sizePolicy">
                        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                         <horstretch>0</horstretch>
@@ -411,9 +414,9 @@
                        </sizepolicy>
                       </property>
                       <property name="accessibleName">
-                       <string>Key file selection</string>
+                       <string>Key file to unlock the database</string>
                       </property>
-                      <property name="editable">
+                      <property name="clearButtonEnabled">
                        <bool>true</bool>
                       </property>
                      </widget>
@@ -575,20 +578,13 @@
     </spacer>
    </item>
   </layout>
-  <action name="keyFileClearIcon">
-   <property name="text">
-    <string>Clear</string>
-   </property>
-   <property name="toolTip">
-    <string>Clear Key File</string>
-   </property>
-  </action>
  </widget>
  <customwidgets>
   <customwidget>
    <class>PasswordEdit</class>
    <extends>QLineEdit</extends>
    <header>gui/PasswordEdit.h</header>
+   <container>1</container>
   </customwidget>
   <customwidget>
    <class>MessageWidget</class>
@@ -603,10 +599,11 @@
   </customwidget>
  </customwidgets>
  <tabstops>
-  <tabstop>comboKeyFile</tabstop>
+  <tabstop>editPassword</tabstop>
+  <tabstop>keyFileLineEdit</tabstop>
   <tabstop>buttonBrowseFile</tabstop>
-  <tabstop>hardwareKeyLabelHelp</tabstop>
-  <tabstop>comboChallengeResponse</tabstop>
+  <tabstop>challengeResponseCombo</tabstop>
+  <tabstop>buttonRedetectYubikey</tabstop>
   <tabstop>checkTouchID</tabstop>
  </tabstops>
  <resources/>

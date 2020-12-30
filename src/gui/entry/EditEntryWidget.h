@@ -24,6 +24,8 @@
 #include <QModelIndex>
 #include <QPointer>
 #include <QScopedPointer>
+#include <QScrollArea>
+#include <QTimer>
 
 #include "config-keepassx.h"
 #include "gui/EditWidget.h"
@@ -111,6 +113,7 @@ private slots:
     void pickColor();
 #ifdef WITH_XC_SSHAGENT
     void toKeeAgentSettings(KeeAgentSettings& settings) const;
+    void setSSHAgentSettings();
     void updateSSHAgent();
     void updateSSHAgentAttachment();
     void updateSSHAgentAttachments();
@@ -172,7 +175,7 @@ private:
     const QScopedPointer<Ui::EditEntryWidgetBrowser> m_browserUi;
     const QScopedPointer<CustomData> m_customData;
 
-    QWidget* const m_mainWidget;
+    QScrollArea* const m_mainWidget;
     QWidget* const m_advancedWidget;
     EditWidgetIcons* const m_iconsWidget;
     QWidget* const m_autoTypeWidget;
@@ -197,6 +200,7 @@ private:
     QButtonGroup* const m_autoTypeWindowSequenceGroup;
     QCompleter* const m_usernameCompleter;
     QStringListModel* const m_usernameCompleterModel;
+    QTimer m_entryModifiedTimer;
 
     Q_DISABLE_COPY(EditEntryWidget)
 };

@@ -36,6 +36,11 @@ const QCommandLineOption Add::UsernameOption = QCommandLineOption(QStringList() 
 const QCommandLineOption Add::UrlOption =
     QCommandLineOption(QStringList() << "url", QObject::tr("URL for the entry."), QObject::tr("URL"));
 
+const QCommandLineOption Add::NotesOption = QCommandLineOption(QStringList() << "n"
+                                                                             << "notes",
+                                                               QObject::tr("Notes for the entry."),
+                                                               QObject::tr("Notes"));
+
 const QCommandLineOption Add::PasswordPromptOption =
     QCommandLineOption(QStringList() << "p"
                                      << "password-prompt",
@@ -51,6 +56,7 @@ Add::Add()
     description = QObject::tr("Add a new entry to a database.");
     options.append(Add::UsernameOption);
     options.append(Add::UrlOption);
+    options.append(Add::NotesOption);
     options.append(Add::PasswordPromptOption);
     positionalArguments.append({QString("entry"), QObject::tr("Path of the entry to add."), QString("")});
 
@@ -69,16 +75,15 @@ Add::Add()
 
 int Add::executeWithDatabase(QSharedPointer<Database> database, QSharedPointer<QCommandLineParser> parser)
 {
-    TextStream inputTextStream(Utils::STDIN, QIODevice::ReadOnly);
-    TextStream outputTextStream(Utils::STDOUT, QIODevice::WriteOnly);
-    TextStream errorTextStream(Utils::STDERR, QIODevice::WriteOnly);
+    auto& out = Utils::STDOUT;
+    auto& err = Utils::STDERR;
 
     const QStringList args = parser->positionalArguments();
     auto& entryPath = args.at(1);
 
     // Cannot use those 2 options at the same time!
     if (parser->isSet(Add::GenerateOption) && parser->isSet(Add::PasswordPromptOption)) {
-        errorTextStream << QObject::tr("Cannot generate a password and prompt at the same time!") << endl;
+        err << QObject::tr("Cannot generate a password and prompt at the same time!") << endl;
         return EXIT_FAILURE;
     }
 
@@ -94,7 +99,7 @@ int Add::executeWithDatabase(QSharedPointer<Database> database, QSharedPointer<Q
 
     Entry* entry = database->rootGroup()->addEntryWithPath(entryPath);
     if (!entry) {
-        errorTextStream << QObject::tr("Could not create entry with path %1.").arg(entryPath) << endl;
+        err << QObject::tr("Could not create entry with path %1.").arg(entryPath) << endl;
         return EXIT_FAILURE;
     }
 
@@ -106,11 +111,15 @@ int Add::executeWithDatabase(QSharedPointer<Database> database, QSharedPointer<Q
         entry->setUrl(parser->value(Add::UrlOption));
     }
 
+    if (!parser->value(Add::NotesOption).isEmpty()) {
+        entry->setNotes(parser->value(Add::NotesOption).replace("\\n", "\n"));
+    }
+
     if (parser->isSet(Add::PasswordPromptOption)) {
         if (!parser->isSet(Command::QuietOption)) {
-            outputTextStream << QObject::tr("Enter password for new entry: ") << flush;
+            out << QObject::tr("Enter password for new entry: ") << flush;
         }
-        QString password = Utils::getPassword(parser->isSet(Command::QuietOption) ? Utils::DEVNULL : Utils::STDOUT);
+        QString password = Utils::getPassword(parser->isSet(Command::QuietOption));
         entry->setPassword(password);
     } else if (parser->isSet(Add::GenerateOption)) {
         QString password = passwordGenerator->generatePassword();
@@ -119,12 +128,12 @@ int Add::executeWithDatabase(QSharedPointer<Database> database, QSharedPointer<Q
 
     QString errorMessage;
     if (!database->save(&errorMessage, true, false)) {
-        errorTextStream << QObject::tr("Writing the database failed %1.").arg(errorMessage) << endl;
+        err << QObject::tr("Writing the database failed %1.").arg(errorMessage) << endl;
         return EXIT_FAILURE;
     }
 
     if (!parser->isSet(Command::QuietOption)) {
-        outputTextStream << QObject::tr("Successfully added entry %1.").arg(entry->title()) << endl;
+        out << QObject::tr("Successfully added entry %1.").arg(entry->title()) << endl;
     }
     return EXIT_SUCCESS;
 }

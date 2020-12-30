@@ -30,8 +30,36 @@ class OSUtilsBase : public QObject
     Q_OBJECT
 
 public:
-    virtual bool isDarkMode() = 0;
+    /**
+     * @return OS dark mode enabled.
+     */
+    virtual bool isDarkMode() const = 0;
+
+    /**
+     * @return KeePassXC set to launch at system startup (autostart).
+     */
+    virtual bool isLaunchAtStartupEnabled() const = 0;
+
+    /**
+     * @param enable Add or remove KeePassXC from system autostart.
+     */
+    virtual void setLaunchAtStartup(bool enable) = 0;
+
+    /**
+     * @return OS caps lock enabled.
+     */
     virtual bool isCapslockEnabled() = 0;
+
+    virtual void registerNativeEventFilter() = 0;
+
+    virtual bool registerGlobalShortcut(const QString& name,
+                                        Qt::Key key,
+                                        Qt::KeyboardModifiers modifiers,
+                                        QString* error = nullptr) = 0;
+    virtual bool unregisterGlobalShortcut(const QString& name) = 0;
+
+signals:
+    void globalShortcutTriggered(const QString& name);
 
 protected:
     explicit OSUtilsBase(QObject* parent = nullptr);

@@ -31,6 +31,7 @@
 #include "core/CustomData.h"
 #include "core/EntryAttachments.h"
 #include "core/EntryAttributes.h"
+#include "core/Global.h"
 #include "core/TimeInfo.h"
 
 class Database;
@@ -81,8 +82,7 @@ public:
     const QUuid& uuid() const;
     const QString uuidToHex() const;
     QImage icon() const;
-    QPixmap iconPixmap() const;
-    QPixmap iconScaledPixmap() const;
+    QPixmap iconPixmap(IconSize size = IconSize::Default) const;
     int iconNumber() const;
     const QUuid& iconUuid() const;
     QString foregroundColor() const;
@@ -106,8 +106,10 @@ public:
     QString notes() const;
     QString attribute(const QString& key) const;
     QString totp() const;
+    QString totpSettingsString() const;
     QSharedPointer<Totp::Settings> totpSettings() const;
     int size() const;
+    QString path() const;
 
     bool hasTotp() const;
     bool isExpired() const;
@@ -123,11 +125,6 @@ public:
     const EntryAttachments* attachments() const;
     CustomData* customData();
     const CustomData* customData() const;
-
-    static const int DefaultIconNumber;
-    static const int ResolveMaximumDepth;
-    static const QString AutoTypeSequenceUsername;
-    static const QString AutoTypeSequencePassword;
 
     void setUuid(const QUuid& uuid);
     void setIcon(int iconNumber);
@@ -205,8 +202,15 @@ public:
         DateTimeUtcDay,
         DateTimeUtcHour,
         DateTimeUtcMinute,
-        DateTimeUtcSecond
+        DateTimeUtcSecond,
+        DbDir
     };
+
+    static const int DefaultIconNumber;
+    static const int ResolveMaximumDepth;
+    static const QString AutoTypeSequenceUsername;
+    static const QString AutoTypeSequencePassword;
+    static CloneFlags DefaultCloneFlags;
 
     /**
      * Creates a duplicate of this entry except that the returned entry isn't
@@ -214,7 +218,7 @@ public:
      * Note that you need to copy the custom icons manually when inserting the
      * new entry into another database.
      */
-    Entry* clone(CloneFlags flags) const;
+    Entry* clone(CloneFlags flags = DefaultCloneFlags) const;
     void copyDataFrom(const Entry* other);
     QString maskPasswordPlaceholders(const QString& str) const;
     Entry* resolveReference(const QString& str) const;
@@ -231,6 +235,9 @@ public:
      */
     void beginUpdate();
     bool endUpdate();
+
+    void moveUp();
+    void moveDown();
 
     Group* group();
     const Group* group() const;

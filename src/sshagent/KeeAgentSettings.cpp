@@ -19,6 +19,11 @@
 #include "KeeAgentSettings.h"
 #include "core/Tools.h"
 
+KeeAgentSettings::KeeAgentSettings()
+{
+    reset();
+}
+
 bool KeeAgentSettings::operator==(const KeeAgentSettings& other) const
 {
     // clang-format off
@@ -48,6 +53,25 @@ bool KeeAgentSettings::isDefault() const
 {
     KeeAgentSettings defaultSettings;
     return (*this == defaultSettings);
+}
+
+/**
+ * Reset this instance to default settings
+ */
+void KeeAgentSettings::reset()
+{
+    m_allowUseOfSshKey = false;
+    m_addAtDatabaseOpen = false;
+    m_removeAtDatabaseClose = false;
+    m_useConfirmConstraintWhenAdding = false;
+    m_useLifetimeConstraintWhenAdding = false;
+    m_lifetimeConstraintDuration = 600;
+
+    m_selectedType = QStringLiteral("file");
+    m_attachmentName.clear();
+    m_saveAttachmentToTempFile = false;
+    m_fileName.clear();
+    m_error.clear();
 }
 
 /**
@@ -300,14 +324,14 @@ QByteArray KeeAgentSettings::toXml() const
 }
 
 /**
- * Check if an entry has KeeAgent settings configured
+ * Check if entry attachments have KeeAgent settings configured
  *
- * @param entry Entry to check the attachment
+ * @param attachments EntryAttachments to check the key
  * @return true if XML document exists
  */
-bool KeeAgentSettings::inEntry(const Entry* entry)
+bool KeeAgentSettings::inEntryAttachments(const EntryAttachments* attachments)
 {
-    return entry->attachments()->hasKey("KeeAgent.settings");
+    return attachments->hasKey("KeeAgent.settings");
 }
 
 /**
@@ -365,12 +389,39 @@ bool KeeAgentSettings::keyConfigured() const
  */
 bool KeeAgentSettings::toOpenSSHKey(const Entry* entry, OpenSSHKey& key, bool decrypt)
 {
+    return toOpenSSHKey(entry->username(), entry->password(), entry->attachments(), key, decrypt);
+}
+
+/**
+ * Read a SSH key based on settings to key.
+ *
+ * Sets error string on error.
+ *
+ * @param username username to set on key if empty
+ * @param password password to decrypt key if needed
+ * @param attachments attachments to read an attachment key from
+ * @param key output key object
+ * @param decrypt avoid private key decryption if possible (old RSA keys are always decrypted)
+ * @return true if key was properly opened
+ */
+bool KeeAgentSettings::toOpenSSHKey(const QString& username,
+                                    const QString& password,
+                                    const EntryAttachments* attachments,
+                                    OpenSSHKey& key,
+                                    bool decrypt)
+{
     QString fileName;
     QByteArray privateKeyData;
 
     if (m_selectedType == "attachment") {
+        if (!attachments) {
+            m_error = QCoreApplication::translate("KeeAgentSettings",
+                                                  "Private key is an attachment but no attachments provided.");
+            return false;
+        }
+
         fileName = m_attachmentName;
-        privateKeyData = entry->attachments()->value(fileName);
+        privateKeyData = attachments->value(fileName);
     } else {
         QFile localFile(fileNameEnvSubst());
         QFileInfo localFileInfo(localFile);
@@ -405,14 +456,14 @@ bool KeeAgentSettings::toOpenSSHKey(const Entry* entry, OpenSSHKey& key, bool de
     }
 
     if (key.encrypted() && (decrypt || key.publicParts().isEmpty())) {
-        if (!key.openKey(entry->password())) {
+        if (!key.openKey(password)) {
             m_error = key.errorString();
             return false;
         }
     }
 
     if (key.comment().isEmpty()) {
-        key.setComment(entry->username());
+        key.setComment(username);
     }
 
     if (key.comment().isEmpty()) {

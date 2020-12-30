@@ -19,35 +19,24 @@
 #ifndef KEEPASSX_RESOURCES_H
 #define KEEPASSX_RESOURCES_H
 
-#include <QColor>
-#include <QHash>
-#include <QIcon>
 #include <QString>
 
 class Resources
 {
 public:
-    QString dataPath(const QString& name);
-    QString pluginPath(const QString& name);
-    QString wordlistPath(const QString& name);
-    QIcon applicationIcon();
-    QIcon trayIcon();
-    QIcon trayIconLocked();
-    QIcon trayIconUnlocked();
-    QIcon icon(const QString& name, bool recolor = true, const QColor& overrideColor = QColor::Invalid);
-    QIcon onOffIcon(const QString& name, bool recolor = true);
+    QString dataPath(const QString& name) const;
+    QString pluginPath(const QString& name) const;
+    QString wordlistPath(const QString& name) const;
 
     static Resources* instance();
 
 private:
     Resources();
-    bool testResourceDir(const QString& dir);
-    bool useDarkIcon();
+    bool trySetResourceDir(const QString& path);
 
     static Resources* m_instance;
 
     QString m_dataPath;
-    QHash<QString, QIcon> m_iconCache;
 
     Q_DISABLE_COPY(Resources)
 };

@@ -24,6 +24,9 @@
 #include "PasswordHealth.h"
 #include "zxcvbn.h"
 
+// Define the static member variable with the custom field name
+const QString PasswordHealth::OPTION_KNOWN_BAD = QStringLiteral("KnownBad");
+
 PasswordHealth::PasswordHealth(double entropy)
     : m_score(entropy)
     , m_entropy(entropy)
@@ -103,7 +106,7 @@ HealthChecker::HealthChecker(QSharedPointer<Database> db)
 {
     // Build the cache of re-used passwords
     for (const auto* entry : db->rootGroup()->entriesRecursive()) {
-        if (!entry->isRecycled()) {
+        if (!entry->isRecycled() && !entry->isAttributeReference("Password")) {
             m_reuse[entry->password()]
                 << QApplication::tr("Used in %1/%2").arg(entry->group()->hierarchy().join('/'), entry->title());
         }
@@ -139,7 +142,7 @@ QSharedPointer<PasswordHealth> HealthChecker::evaluate(const Entry* entry) const
         for (int i = 0; i < used.size(); ++i) {
             health->addScoreDetails(used[i]);
             if (i == 19) {
-                health->addScoreDetails(QStringLiteral("..."));
+                health->addScoreDetails("…");
                 break;
             }
         }
@@ -170,12 +173,14 @@ QSharedPointer<PasswordHealth> HealthChecker::evaluate(const Entry* entry) const
             if (health->score() > 60) {
                 health->setScore(60);
             }
+            // clang-format off
             health->adjustScore((30 - days) * -2);
             health->addScoreReason(days <= 2 ? QApplication::tr("Password is about to expire")
                                              : days <= 10 ? QApplication::tr("Password expires in %1 days").arg(days)
                                                           : QApplication::tr("Password will expire soon"));
             health->addScoreDetails(QApplication::tr("Password expires on %1")
                                         .arg(entry->timeInfo().expiryTime().toString(Qt::DefaultLocaleShortDate)));
+            //clang-format on
         }
     }
 

@@ -27,13 +27,13 @@
 
 Info::Info()
 {
-    name = QString("db-show");
+    name = QString("db-info");
     description = QObject::tr("Show a database's information.");
 }
 
 int Info::executeWithDatabase(QSharedPointer<Database> database, QSharedPointer<QCommandLineParser>)
 {
-    TextStream out(Utils::STDOUT, QIODevice::WriteOnly);
+    auto& out = Utils::STDOUT;
 
     out << QObject::tr("UUID: ") << database->uuid().toString() << endl;
     out << QObject::tr("Name: ") << database->metadata()->name() << endl;

@@ -36,6 +36,8 @@ const int Entry::ResolveMaximumDepth = 10;
 const QString Entry::AutoTypeSequenceUsername = "{USERNAME}{ENTER}";
 const QString Entry::AutoTypeSequencePassword = "{PASSWORD}{ENTER}";
 
+Entry::CloneFlags Entry::DefaultCloneFlags = Entry::CloneNewUuid | Entry::CloneResetTimeInfo;
+
 Entry::Entry()
     : m_attributes(new EntryAttributes(this))
     , m_attachments(new EntryAttachments(this))
@@ -163,7 +165,7 @@ const QString Entry::uuidToHex() const
 QImage Entry::icon() const
 {
     if (m_data.customIcon.isNull()) {
-        return databaseIcons()->icon(m_data.iconNumber);
+        return databaseIcons()->icon(m_data.iconNumber).toImage();
     } else {
         Q_ASSERT(database());
 
@@ -175,27 +177,23 @@ QImage Entry::icon() const
     }
 }
 
-QPixmap Entry::iconPixmap() const
+QPixmap Entry::iconPixmap(IconSize size) const
 {
+    QPixmap icon(size, size);
     if (m_data.customIcon.isNull()) {
-        return databaseIcons()->iconPixmap(m_data.iconNumber);
+        icon = databaseIcons()->icon(m_data.iconNumber, size);
+    } else {
+        Q_ASSERT(database());
+        if (database()) {
+            icon = database()->metadata()->customIconPixmap(m_data.customIcon, size);
+        }
     }
 
-    Q_ASSERT(database());
-    if (database()) {
-        return database()->metadata()->customIconPixmap(m_data.customIcon);
+    if (isExpired()) {
+        icon = databaseIcons()->applyBadge(icon, DatabaseIcons::Badges::Expired);
     }
-    return QPixmap();
-}
 
-QPixmap Entry::iconScaledPixmap() const
-{
-    if (m_data.customIcon.isNull()) {
-        // built-in icons are 16x16 so don't need to be scaled
-        return databaseIcons()->iconPixmap(m_data.iconNumber);
-    }
-    Q_ASSERT(database());
-    return database()->metadata()->customIconScaledPixmap(m_data.customIcon);
+    return icon;
 }
 
 int Entry::iconNumber() const
@@ -467,7 +465,8 @@ void Entry::setTotp(QSharedPointer<Totp::Settings> settings)
         m_data.totpSettings.reset();
     } else {
         m_data.totpSettings = std::move(settings);
-        auto text = Totp::writeSettings(m_data.totpSettings, title(), username());
+        auto text = Totp::writeSettings(
+            m_data.totpSettings, resolveMultiplePlaceholders(title()), resolveMultiplePlaceholders(username()));
         if (m_data.totpSettings->format != Totp::StorageFormat::LEGACY) {
             m_attributes->set(Totp::ATTRIBUTE_OTP, text, true);
         } else {
@@ -485,12 +484,30 @@ void Entry::updateTotp()
                                                   m_attributes->value(Totp::ATTRIBUTE_SEED));
     } else if (m_attributes->contains(Totp::ATTRIBUTE_OTP)) {
         m_data.totpSettings = Totp::parseSettings(m_attributes->value(Totp::ATTRIBUTE_OTP));
+    } else {
+        m_data.totpSettings.reset();
     }
 }
 
 QSharedPointer<Totp::Settings> Entry::totpSettings() const
 {
     return m_data.totpSettings;
+}
+
+QString Entry::totpSettingsString() const
+{
+    if (m_data.totpSettings) {
+        return Totp::writeSettings(
+            m_data.totpSettings, resolveMultiplePlaceholders(title()), resolveMultiplePlaceholders(username()), true);
+    }
+    return {};
+}
+
+QString Entry::path() const
+{
+    auto path = group()->hierarchy();
+    path << title();
+    return path.mid(1).join("/");
 }
 
 void Entry::setUuid(const QUuid& uuid)
@@ -667,6 +684,7 @@ void Entry::truncateHistory()
         return;
     }
 
+    bool changed = false;
     int histMaxItems = db->metadata()->historyMaxItems();
     if (histMaxItems > -1) {
         int historyCount = 0;
@@ -678,6 +696,7 @@ void Entry::truncateHistory()
             if (historyCount > histMaxItems) {
                 delete entry;
                 i.remove();
+                changed = true;
             }
         }
     }
@@ -701,8 +720,13 @@ void Entry::truncateHistory()
             if (size > histMaxSize) {
                 delete historyItem;
                 i.remove();
+                changed = true;
             }
         }
+    }
+
+    if (changed) {
+        emit entryModified();
     }
 }
 
@@ -903,6 +927,10 @@ QString Entry::resolvePlaceholderRecursive(const QString& placeholder, int maxDe
             return url();
         }
         return resolveMultiplePlaceholdersRecursive(url(), maxDepth - 1);
+    case PlaceholderType::DbDir: {
+        QFileInfo fileInfo(database()->filePath());
+        return fileInfo.absoluteDir().absolutePath();
+    }
     case PlaceholderType::UrlWithoutScheme:
     case PlaceholderType::UrlScheme:
     case PlaceholderType::UrlHost:
@@ -1062,6 +1090,20 @@ QString Entry::referenceFieldValue(EntryReferenceType referenceType) const
     return QString();
 }
 
+void Entry::moveUp()
+{
+    if (m_group) {
+        m_group->moveEntryUp(this);
+    }
+}
+
+void Entry::moveDown()
+{
+    if (m_group) {
+        m_group->moveEntryDown(this);
+    }
+}
+
 Group* Entry::group()
 {
     return m_group;
@@ -1086,9 +1128,8 @@ void Entry::setGroup(Group* group)
             m_group->database()->addDeletedObject(m_uuid);
 
             // copy custom icon to the new database
-            if (!iconUuid().isNull() && group->database()
-                && m_group->database()->metadata()->containsCustomIcon(iconUuid())
-                && !group->database()->metadata()->containsCustomIcon(iconUuid())) {
+            if (!iconUuid().isNull() && group->database() && m_group->database()->metadata()->hasCustomIcon(iconUuid())
+                && !group->database()->metadata()->hasCustomIcon(iconUuid())) {
                 group->database()->metadata()->addCustomIcon(iconUuid(), icon());
             }
         }
@@ -1237,7 +1278,8 @@ Entry::PlaceholderType Entry::placeholderType(const QString& placeholder) const
         {QStringLiteral("{DT_UTC_DAY}"), PlaceholderType::DateTimeUtcDay},
         {QStringLiteral("{DT_UTC_HOUR}"), PlaceholderType::DateTimeUtcHour},
         {QStringLiteral("{DT_UTC_MINUTE}"), PlaceholderType::DateTimeUtcMinute},
-        {QStringLiteral("{DT_UTC_SECOND}"), PlaceholderType::DateTimeUtcSecond}};
+        {QStringLiteral("{DT_UTC_SECOND}"), PlaceholderType::DateTimeUtcSecond},
+        {QStringLiteral("{DB_DIR}"), PlaceholderType::DbDir}};
 
     return placeholders.value(placeholder.toUpper(), PlaceholderType::Unknown);
 }

@@ -19,24 +19,49 @@
 #define KEEPASSXC_NIXUTILS_H
 
 #include "gui/osutils/OSUtilsBase.h"
+#include <QAbstractNativeEventFilter>
 #include <QPointer>
 
-class NixUtils : public OSUtilsBase
+class NixUtils : public OSUtilsBase, QAbstractNativeEventFilter
 {
     Q_OBJECT
 
 public:
     static NixUtils* instance();
 
-    bool isDarkMode() override;
+    bool isDarkMode() const override;
+    bool isLaunchAtStartupEnabled() const override;
+    void setLaunchAtStartup(bool enable) override;
     bool isCapslockEnabled() override;
+
+    void registerNativeEventFilter() override;
+
+    bool registerGlobalShortcut(const QString& name,
+                                Qt::Key key,
+                                Qt::KeyboardModifiers modifiers,
+                                QString* error = nullptr) override;
+    bool unregisterGlobalShortcut(const QString& name) override;
+
+signals:
+    void keymapChanged();
 
 private:
     explicit NixUtils(QObject* parent = nullptr);
     ~NixUtils() override;
 
-private:
+    bool nativeEventFilter(const QByteArray& eventType, void* message, long*) override;
+    QString getAutostartDesktopFilename(bool createDirs = false) const;
+
+    bool triggerGlobalShortcut(uint keycode, uint modifiers);
+
     static QPointer<NixUtils> m_instance;
+
+    struct globalShortcut
+    {
+        uint nativeKeyCode;
+        uint nativeModifiers;
+    };
+    QHash<QString, QSharedPointer<globalShortcut>> m_globalShortcuts;
 
     Q_DISABLE_COPY(NixUtils)
 };

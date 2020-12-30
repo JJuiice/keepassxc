@@ -262,7 +262,7 @@ void KdbxXmlReader::parseMeta()
         } else if (m_xml.name() == "Color") {
             m_meta->setColor(readColor());
         } else if (m_xml.name() == "MasterKeyChanged") {
-            m_meta->setMasterKeyChanged(readDateTime());
+            m_meta->setDatabaseKeyChanged(readDateTime());
         } else if (m_xml.name() == "MasterKeyChangeRec") {
             m_meta->setMasterKeyChangeRec(readNumber());
         } else if (m_xml.name() == "MasterKeyChangeForce") {
@@ -368,7 +368,7 @@ void KdbxXmlReader::parseIcon()
 
     if (uuidSet && iconSet) {
         // Check for duplicate UUID (corruption)
-        if (m_meta->containsCustomIcon(uuid)) {
+        if (m_meta->hasCustomIcon(uuid)) {
             uuid = QUuid::createUuid();
         }
         m_meta->addCustomIcon(uuid, icon);
@@ -513,9 +513,9 @@ Group* KdbxXmlReader::parseGroup()
                     raiseError(tr("Invalid group icon number"));
                 }
                 iconId = 0;
-            } else if (iconId >= DatabaseIcons::IconCount) {
+            } else if (iconId >= databaseIcons()->count()) {
                 qWarning("KdbxXmlReader::parseGroup: icon id \"%d\" not supported", iconId);
-                iconId = DatabaseIcons::IconCount - 1;
+                iconId = databaseIcons()->count() - 1;
             }
 
             group->setIcon(iconId);
@@ -875,11 +875,13 @@ QPair<QString, QString> KdbxXmlReader::parseEntryBinary(Entry* entry)
     }
 
     if (keySet && valueSet) {
-        if (entry->attachments()->hasKey(key)) {
-            raiseError(tr("Duplicate attachment found"));
-        } else {
-            entry->attachments()->set(key, value);
+        if (entry->attachments()->hasKey(key) && entry->attachments()->value(key) != value) {
+            // NOTE: This only impacts KDBX 3.x databases
+            // Prepend a random string to the key to make it unique and prevent data loss
+            key = key.prepend(QUuid::createUuid().toString().mid(1, 8) + "_");
+            qWarning("Duplicate attachment name found, renamed to: %s", qPrintable(key));
         }
+        entry->attachments()->set(key, value);
     } else {
         raiseError(tr("Entry binary key or value missing"));
     }

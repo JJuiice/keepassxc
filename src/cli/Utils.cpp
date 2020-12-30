@@ -17,6 +17,10 @@
 
 #include "Utils.h"
 
+#ifdef WITH_XC_YUBIKEY
+#include "keys/YkChallengeResponseKeyCLI.h"
+#endif
+
 #ifdef Q_OS_WIN
 #include <windows.h>
 #else
@@ -30,29 +34,33 @@
 
 namespace Utils
 {
-    /**
-     * STDOUT file handle for the CLI.
-     */
-    FILE* STDOUT = stdout;
+    QTextStream STDOUT;
+    QTextStream STDERR;
+    QTextStream STDIN;
+    QTextStream DEVNULL;
 
-    /**
-     * STDERR file handle for the CLI.
-     */
-    FILE* STDERR = stderr;
+    void setDefaultTextStreams()
+    {
+        auto fd = new QFile();
+        fd->open(stdout, QIODevice::WriteOnly);
+        STDOUT.setDevice(fd);
 
-    /**
-     * STDIN file handle for the CLI.
-     */
-    FILE* STDIN = stdin;
+        fd = new QFile();
+        fd->open(stderr, QIODevice::WriteOnly);
+        STDERR.setDevice(fd);
 
-/**
- * DEVNULL file handle for the CLI.
- */
+        fd = new QFile();
+        fd->open(stdin, QIODevice::ReadOnly);
+        STDIN.setDevice(fd);
+
+        fd = new QFile();
 #ifdef Q_OS_WIN
-    FILE* DEVNULL = fopen("nul", "w");
+        fd->open(fopen("nul", "w"), QIODevice::WriteOnly);
 #else
-    FILE* DEVNULL = fopen("/dev/null", "w");
+        fd->open(fopen("/dev/null", "w"), QIODevice::WriteOnly);
 #endif
+        DEVNULL.setDevice(fd);
+    }
 
     void setStdinEcho(bool enable = true)
     {
@@ -82,36 +90,14 @@ namespace Utils
 #endif
     }
 
-    namespace Test
-    {
-        QStringList nextPasswords = {};
-
-        /**
-         * Set the next password returned by \link getPassword() instead of reading it from STDIN.
-         * Multiple calls to this method will fill a queue of passwords.
-         * This function is intended for testing purposes.
-         *
-         * @param password password to return next
-         */
-        void setNextPassword(const QString& password, bool repeat)
-        {
-            nextPasswords.append(password);
-            if (repeat) {
-                nextPasswords.append(password);
-            }
-        }
-    } // namespace Test
-
     QSharedPointer<Database> unlockDatabase(const QString& databaseFilename,
                                             const bool isPasswordProtected,
                                             const QString& keyFilename,
                                             const QString& yubiKeySlot,
-                                            FILE* outputDescriptor,
-                                            FILE* errorDescriptor)
+                                            bool quiet)
     {
+        auto& err = quiet ? DEVNULL : STDERR;
         auto compositeKey = QSharedPointer<CompositeKey>::create();
-        TextStream out(outputDescriptor);
-        TextStream err(errorDescriptor);
 
         QFileInfo dbFileInfo(databaseFilename);
         if (dbFileInfo.canonicalFilePath().isEmpty()) {
@@ -130,8 +116,8 @@ namespace Utils
         }
 
         if (isPasswordProtected) {
-            out << QObject::tr("Enter password to unlock %1: ").arg(databaseFilename) << flush;
-            QString line = Utils::getPassword(outputDescriptor);
+            err << QObject::tr("Enter password to unlock %1: ").arg(databaseFilename) << flush;
+            QString line = Utils::getPassword(quiet);
             auto passwordKey = QSharedPointer<PasswordKey>::create();
             passwordKey->setPassword(line);
             compositeKey->addKey(passwordKey);
@@ -146,9 +132,9 @@ namespace Utils
                 return {};
             }
 
-            if (fileKey->type() != FileKey::Hashed) {
-                err << QObject::tr("WARNING: You are using a legacy key file format which may become\n"
-                                   "unsupported in the future.\n\n"
+            if (fileKey->type() != FileKey::KeePass2XMLv2 && fileKey->type() != FileKey::Hashed) {
+                err << QObject::tr("WARNING: You are using an old key file format which KeePassXC may\n"
+                                   "stop supporting in the future.\n\n"
                                    "Please consider generating a new key file.")
                     << endl;
             }
@@ -159,25 +145,28 @@ namespace Utils
 
 #ifdef WITH_XC_YUBIKEY
         if (!yubiKeySlot.isEmpty()) {
+            unsigned int serial = 0;
+            int slot;
+
             bool ok = false;
-            int slot = yubiKeySlot.toInt(&ok, 10);
+            auto parts = yubiKeySlot.split(":");
+            slot = parts[0].toInt(&ok);
+
             if (!ok || (slot != 1 && slot != 2)) {
-                err << QObject::tr("Invalid YubiKey slot %1").arg(yubiKeySlot) << endl;
+                err << QObject::tr("Invalid YubiKey slot %1").arg(parts[0]) << endl;
                 return {};
             }
 
-            QString errorMessage;
-            bool blocking = YubiKey::instance()->checkSlotIsBlocking(slot, errorMessage);
-            if (!errorMessage.isEmpty()) {
-                err << errorMessage << endl;
-                return {};
+            if (parts.size() > 1) {
+                serial = parts[1].toUInt(&ok, 10);
+                if (!ok) {
+                    err << QObject::tr("Invalid YubiKey serial %1").arg(parts[1]) << endl;
+                    return {};
+                }
             }
 
             auto key = QSharedPointer<YkChallengeResponseKeyCLI>(new YkChallengeResponseKeyCLI(
-                slot,
-                blocking,
-                QObject::tr("Please touch the button on your YubiKey to unlock %1").arg(databaseFilename),
-                outputDescriptor));
+                {serial, slot}, QObject::tr("Please touch the button on your YubiKey to continue…"), err));
             compositeKey->addChallengeResponseKey(key);
         }
 #else
@@ -200,19 +189,16 @@ namespace Utils
      *
      * @return the password
      */
-    QString getPassword(FILE* outputDescriptor)
+    QString getPassword(bool quiet)
     {
-        TextStream out(outputDescriptor, QIODevice::WriteOnly);
-
-        // return preset password if one is set
-        if (!Test::nextPasswords.isEmpty()) {
-            auto password = Test::nextPasswords.takeFirst();
-            // simulate user entering newline
-            out << endl;
-            return password;
-        }
-
-        static TextStream in(STDIN, QIODevice::ReadOnly);
+#ifdef __AFL_COMPILER
+        // Fuzz test build takes password from environment variable to
+        // allow non-interactive operation
+        const auto env = getenv("KEYPASSXC_AFL_PASSWORD");
+        return env ? env : "";
+#else
+        auto& in = STDIN;
+        auto& out = quiet ? DEVNULL : STDERR;
 
         setStdinEcho(false);
         QString line = in.readLine();
@@ -220,6 +206,7 @@ namespace Utils
         out << endl;
 
         return line;
+#endif // __AFL_COMPILER
     }
 
     /**
@@ -228,37 +215,34 @@ namespace Utils
      * @return Pointer to the PasswordKey or null if passwordkey is skipped
      *         by user
      */
-    QSharedPointer<PasswordKey> getPasswordFromStdin()
+    QSharedPointer<PasswordKey> getConfirmedPassword()
     {
-        QSharedPointer<PasswordKey> passwordKey;
-        QTextStream out(Utils::STDOUT, QIODevice::WriteOnly);
+        auto& err = STDERR;
+        auto& in = STDIN;
 
-        out << QObject::tr("Enter password to encrypt database (optional): ");
-        out.flush();
+        QSharedPointer<PasswordKey> passwordKey;
+
+        err << QObject::tr("Enter password to encrypt database (optional): ");
+        err.flush();
         auto password = Utils::getPassword();
 
         if (password.isEmpty()) {
-            out << QObject::tr("Do you want to create a database with an empty password? [y/N]: ");
-            out.flush();
-            TextStream ts(STDIN, QIODevice::ReadOnly);
-            if (!ts.device()->isSequential()) {
-                // This is required for testing on macOS
-                ts.seek(0);
-            }
-            auto ans = ts.readLine();
+            err << QObject::tr("Do you want to create a database with an empty password? [y/N]: ");
+            err.flush();
+            auto ans = in.readLine();
             if (ans.toLower().startsWith("y")) {
                 passwordKey = QSharedPointer<PasswordKey>::create("");
             }
-            out << endl;
+            err << endl;
         } else {
-            out << QObject::tr("Repeat password: ");
-            out.flush();
+            err << QObject::tr("Repeat password: ");
+            err.flush();
             auto repeat = Utils::getPassword();
 
             if (password == repeat) {
                 passwordKey = QSharedPointer<PasswordKey>::create(password);
             } else {
-                out << QObject::tr("Error: Passwords do not match.") << endl;
+                err << QObject::tr("Error: Passwords do not match.") << endl;
             }
         }
 
@@ -271,7 +255,7 @@ namespace Utils
      */
     int clipText(const QString& text)
     {
-        TextStream err(Utils::STDERR);
+        auto& err = STDERR;
 
         // List of programs and their arguments
         QList<QPair<QString, QString>> clipPrograms;
@@ -387,4 +371,37 @@ namespace Utils
         return result;
     }
 
+    /**
+     * Load a key file from disk. When the path specified does not exist a
+     * new file will be generated. No folders will be generated so the parent
+     * folder of the specified file needs to exist
+     *
+     * If the key file cannot be loaded or created the function will fail.
+     *
+     * @param path Path to the key file to be loaded
+     * @param fileKey Resulting fileKey
+     * @return true if the key file was loaded succesfully
+     */
+    bool loadFileKey(const QString& path, QSharedPointer<FileKey>& fileKey)
+    {
+        auto& err = Utils::STDERR;
+        QString error;
+        fileKey = QSharedPointer<FileKey>(new FileKey());
+
+        if (!QFileInfo::exists(path)) {
+            fileKey->create(path, &error);
+
+            if (!error.isEmpty()) {
+                err << QObject::tr("Creating KeyFile %1 failed: %2").arg(path, error) << endl;
+                return false;
+            }
+        }
+
+        if (!fileKey->load(path, &error)) {
+            err << QObject::tr("Loading KeyFile %1 failed: %2").arg(path, error) << endl;
+            return false;
+        }
+
+        return true;
+    }
 } // namespace Utils

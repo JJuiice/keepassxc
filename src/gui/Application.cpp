@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 2012 Tobias Tangemann
  *  Copyright (C) 2012 Felix Geyer <debfx@fobos.de>
- *  Copyright (C) 2017 KeePassXC Team <team@keepassxc.org>
+ *  Copyright (C) 2020 KeePassXC Team <team@keepassxc.org>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,9 +20,11 @@
 #include "Application.h"
 
 #include "autotype/AutoType.h"
+#include "core/Bootstrap.h"
 #include "core/Config.h"
 #include "core/Global.h"
 #include "gui/MainWindow.h"
+#include "gui/MessageBox.h"
 #include "gui/osutils/OSUtils.h"
 #include "gui/styles/dark/DarkStyle.h"
 #include "gui/styles/light/LightStyle.h"
@@ -33,10 +35,6 @@
 #include <QSocketNotifier>
 #include <QStandardPaths>
 #include <QtNetwork/QLocalSocket>
-
-#if defined(Q_OS_WIN) || (defined(Q_OS_UNIX) && !defined(Q_OS_MACOS))
-#include "core/OSEventFilter.h"
-#endif
 
 #if defined(Q_OS_UNIX)
 #include <signal.h>
@@ -58,35 +56,13 @@ Application::Application(int& argc, char** argv)
     , m_alreadyRunning(false)
     , m_lockFile(nullptr)
 #if defined(Q_OS_WIN) || (defined(Q_OS_UNIX) && !defined(Q_OS_MACOS))
-    , m_osEventFilter(new OSEventFilter())
 {
-    installNativeEventFilter(m_osEventFilter.data());
 #else
 {
 #endif
 #if defined(Q_OS_UNIX)
     registerUnixSignals();
 #endif
-
-    QString appTheme = config()->get(Config::GUI_ApplicationTheme).toString();
-    if (appTheme == "auto") {
-        if (osUtils->isDarkMode()) {
-            setStyle(new DarkStyle);
-            m_darkTheme = true;
-        } else {
-            setStyle(new LightStyle);
-        }
-    } else if (appTheme == "light") {
-        setStyle(new LightStyle);
-    } else if (appTheme == "dark") {
-        setStyle(new DarkStyle);
-        m_darkTheme = true;
-    } else {
-        // Classic mode, only check for dark theme when not on Windows
-#ifndef Q_OS_WIN
-        m_darkTheme = osUtils->isDarkMode();
-#endif
-    }
 
     QString userName = qgetenv("USER");
     if (userName.isEmpty()) {
@@ -159,6 +135,66 @@ Application::~Application()
     if (m_lockFile) {
         m_lockFile->unlock();
         delete m_lockFile;
+    }
+}
+
+/**
+ * Perform early application bootstrapping such as setting up search paths,
+ * configuration OS security properties, and loading translators.
+ * A QApplication object has to be instantiated before calling this function.
+ */
+void Application::bootstrap()
+{
+    Bootstrap::bootstrap();
+
+#ifdef Q_OS_WIN
+    // Qt on Windows uses "MS Shell Dlg 2" as the default font for many widgets, which resolves
+    // to Tahoma 8pt, whereas the correct font would be "Segoe UI" 9pt.
+    // Apparently, some widgets are already using the correct font. Thanks, MuseScore for this neat fix!
+    QApplication::setFont(QApplication::font("QMessageBox"));
+#endif
+
+    osUtils->registerNativeEventFilter();
+    MessageBox::initializeButtonDefs();
+
+#ifdef Q_OS_MACOS
+    // Don't show menu icons on OSX
+    QApplication::setAttribute(Qt::AA_DontShowIconsInMenus);
+#endif
+}
+
+void Application::applyTheme()
+{
+    auto appTheme = config()->get(Config::GUI_ApplicationTheme).toString();
+    if (appTheme == "auto") {
+        appTheme = osUtils->isDarkMode() ? "dark" : "light";
+#ifdef Q_OS_WIN
+        if (winUtils()->isHighContrastMode()) {
+            appTheme = "classic";
+        }
+#endif
+    }
+
+    if (appTheme == "light") {
+        setStyle(new LightStyle);
+        // Workaround Qt 5.15+ bug
+        setPalette(style()->standardPalette());
+    } else if (appTheme == "dark") {
+        setStyle(new DarkStyle);
+        // Workaround Qt 5.15+ bug
+        setPalette(style()->standardPalette());
+        m_darkTheme = true;
+    } else {
+        // Classic mode, don't check for dark theme on Windows
+        // because Qt 5.x does not support it
+#ifndef Q_OS_WIN
+        m_darkTheme = osUtils->isDarkMode();
+#endif
+        QFile stylesheetFile(":/styles/base/classicstyle.qss");
+        if (stylesheetFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            setStyleSheet(stylesheetFile.readAll());
+            stylesheetFile.close();
+        }
     }
 }
 
@@ -308,4 +344,17 @@ bool Application::sendFileNamesToRunningInstance(const QStringList& fileNames)
 bool Application::isDarkTheme() const
 {
     return m_darkTheme;
+}
+
+void Application::restart()
+{
+    // Disable single instance
+    m_lockServer.close();
+    if (m_lockFile) {
+        m_lockFile->unlock();
+        delete m_lockFile;
+        m_lockFile = nullptr;
+    }
+
+    exit(RESTART_EXITCODE);
 }

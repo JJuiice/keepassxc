@@ -29,7 +29,7 @@
 #include "core/Global.h"
 #include "core/Group.h"
 #include "core/Metadata.h"
-#include "core/Resources.h"
+#include "gui/Icons.h"
 #ifdef Q_OS_MACOS
 #include "gui/osutils/macutils/MacUtils.h"
 #endif
@@ -37,11 +37,10 @@
 EntryModel::EntryModel(QObject* parent)
     : QAbstractTableModel(parent)
     , m_group(nullptr)
-    , m_hideUsernames(false)
-    , m_hidePasswords(true)
     , HiddenContentDisplay(QString("\u25cf").repeated(6))
     , DateFormat(Qt::DefaultLocaleShortDate)
 {
+    connect(config(), &Config::changed, this, &EntryModel::onConfigChanged);
 }
 
 Entry* EntryModel::entryFromIndex(const QModelIndex& index) const
@@ -156,7 +155,7 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
             }
             return result;
         case Username:
-            if (m_hideUsernames) {
+            if (config()->get(Config::GUI_HideUsernames).toBool()) {
                 result = EntryModel::HiddenContentDisplay;
             } else {
                 result = entry->resolveMultiplePlaceholders(entry->username());
@@ -164,9 +163,12 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
             if (attr->isReference(EntryAttributes::UserNameKey)) {
                 result.prepend(tr("Ref: ", "Reference abbreviation"));
             }
+            if (entry->username().isEmpty() && !config()->get(Config::Security_PasswordEmptyPlaceholder).toBool()) {
+                result = "";
+            }
             return result;
         case Password:
-            if (m_hidePasswords) {
+            if (config()->get(Config::GUI_HidePasswords).toBool()) {
                 result = EntryModel::HiddenContentDisplay;
             } else {
                 result = entry->resolveMultiplePlaceholders(entry->password());
@@ -174,7 +176,7 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
             if (attr->isReference(EntryAttributes::PasswordKey)) {
                 result.prepend(tr("Ref: ", "Reference abbreviation"));
             }
-            if (entry->password().isEmpty() && config()->get(Config::Security_PasswordEmptyNoDots).toBool()) {
+            if (entry->password().isEmpty() && !config()->get(Config::Security_PasswordEmptyPlaceholder).toBool()) {
                 result = "";
             }
             return result;
@@ -185,14 +187,16 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
             }
             return result;
         case Notes:
-            // Display only first line of notes in simplified format if not hidden
-            if (config()->get(Config::Security_HideNotes).toBool()) {
-                result = EntryModel::HiddenContentDisplay;
-            } else {
-                result = entry->notes().section("\n", 0, 0).simplified();
-            }
-            if (attr->isReference(EntryAttributes::NotesKey)) {
-                result.prepend(tr("Ref: ", "Reference abbreviation"));
+            if (!entry->notes().isEmpty()) {
+                if (config()->get(Config::Security_HideNotes).toBool()) {
+                    result = EntryModel::HiddenContentDisplay;
+                } else {
+                    // Display only first line of notes in simplified format if not hidden
+                    result = entry->notes().section("\n", 0, 0).simplified();
+                }
+                if (attr->isReference(EntryAttributes::NotesKey)) {
+                    result.prepend(tr("Ref: ", "Reference abbreviation"));
+                }
             }
             return result;
         case Expires:
@@ -271,22 +275,19 @@ QVariant EntryModel::data(const QModelIndex& index, int role) const
         switch (index.column()) {
         case ParentGroup:
             if (entry->group()) {
-                return entry->group()->iconScaledPixmap();
+                return entry->group()->iconPixmap();
             }
             break;
         case Title:
-            if (entry->isExpired()) {
-                return databaseIcons()->iconPixmap(DatabaseIcons::ExpiredIconIndex);
-            }
-            return entry->iconScaledPixmap();
+            return entry->iconPixmap();
         case Paperclip:
             if (!entry->attachments()->isEmpty()) {
-                return resources()->icon("paperclip");
+                return icons()->icon("paperclip");
             }
             break;
         case Totp:
             if (entry->hasTotp()) {
-                return resources()->icon("chronometer");
+                return icons()->icon("chronometer");
             }
             break;
         }
@@ -359,9 +360,9 @@ QVariant EntryModel::headerData(int section, Qt::Orientation orientation, int ro
     } else if (role == Qt::DecorationRole) {
         switch (section) {
         case Paperclip:
-            return resources()->icon("paperclip");
+            return icons()->icon("paperclip");
         case Totp:
-            return resources()->icon("chronometer");
+            return icons()->icon("chronometer");
         }
     } else if (role == Qt::ToolTipRole) {
         switch (section) {
@@ -497,14 +498,59 @@ void EntryModel::entryRemoved()
     if (m_group) {
         m_entries = m_group->entries();
     }
-
     endRemoveRows();
+}
+
+void EntryModel::entryAboutToMoveUp(int row)
+{
+    beginMoveRows(QModelIndex(), row, row, QModelIndex(), row - 1);
+    if (m_group) {
+        m_entries.move(row, row - 1);
+    }
+}
+
+void EntryModel::entryMovedUp()
+{
+    if (m_group) {
+        m_entries = m_group->entries();
+    }
+    endMoveRows();
+}
+
+void EntryModel::entryAboutToMoveDown(int row)
+{
+    beginMoveRows(QModelIndex(), row, row, QModelIndex(), row + 2);
+    if (m_group) {
+        m_entries.move(row, row + 1);
+    }
+}
+
+void EntryModel::entryMovedDown()
+{
+    if (m_group) {
+        m_entries = m_group->entries();
+    }
+    endMoveRows();
 }
 
 void EntryModel::entryDataChanged(Entry* entry)
 {
     int row = m_entries.indexOf(entry);
     emit dataChanged(index(row, 0), index(row, columnCount() - 1));
+}
+
+void EntryModel::onConfigChanged(Config::ConfigKey key)
+{
+    switch (key) {
+    case Config::GUI_HideUsernames:
+        emit dataChanged(index(0, Username), index(rowCount() - 1, Username), {Qt::DisplayRole});
+        break;
+    case Config::GUI_HidePasswords:
+        emit dataChanged(index(0, Password), index(rowCount() - 1, Password), {Qt::DisplayRole});
+        break;
+    default:
+        break;
+    }
 }
 
 void EntryModel::severConnections()
@@ -524,41 +570,9 @@ void EntryModel::makeConnections(const Group* group)
     connect(group, SIGNAL(entryAdded(Entry*)), SLOT(entryAdded(Entry*)));
     connect(group, SIGNAL(entryAboutToRemove(Entry*)), SLOT(entryAboutToRemove(Entry*)));
     connect(group, SIGNAL(entryRemoved(Entry*)), SLOT(entryRemoved()));
+    connect(group, SIGNAL(entryAboutToMoveUp(int)), SLOT(entryAboutToMoveUp(int)));
+    connect(group, SIGNAL(entryMovedUp()), SLOT(entryMovedUp()));
+    connect(group, SIGNAL(entryAboutToMoveDown(int)), SLOT(entryAboutToMoveDown(int)));
+    connect(group, SIGNAL(entryMovedDown()), SLOT(entryMovedDown()));
     connect(group, SIGNAL(entryDataChanged(Entry*)), SLOT(entryDataChanged(Entry*)));
-}
-
-/**
- * Get current state of 'Hide Usernames' setting
- */
-bool EntryModel::isUsernamesHidden() const
-{
-    return m_hideUsernames;
-}
-
-/**
- * Set state of 'Hide Usernames' setting and signal change
- */
-void EntryModel::setUsernamesHidden(bool hide)
-{
-    m_hideUsernames = hide;
-    emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
-    emit usernamesHiddenChanged();
-}
-
-/**
- * Get current state of 'Hide Passwords' setting
- */
-bool EntryModel::isPasswordsHidden() const
-{
-    return m_hidePasswords;
-}
-
-/**
- * Set state of 'Hide Passwords' setting and signal change
- */
-void EntryModel::setPasswordsHidden(bool hide)
-{
-    m_hidePasswords = hide;
-    emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
-    emit passwordsHiddenChanged();
 }

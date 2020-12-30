@@ -26,8 +26,10 @@ class DarkStyle : public BaseStyle
     Q_OBJECT
 
 public:
+    DarkStyle();
+    QPalette standardPalette() const override;
+
     using BaseStyle::polish;
-    void polish(QPalette& palette) override;
     void polish(QWidget* widget) override;
 
 protected:

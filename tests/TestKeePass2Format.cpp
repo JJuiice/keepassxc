@@ -87,9 +87,9 @@ void TestKeePass2Format::testXmlMetadata()
     QCOMPARE(m_xmlDb->metadata()->defaultUserNameChanged(), MockClock::datetimeUtc(2010, 8, 8, 17, 27, 45));
     QCOMPARE(m_xmlDb->metadata()->maintenanceHistoryDays(), 127);
     QCOMPARE(m_xmlDb->metadata()->color(), QString("#FFEF00"));
-    QCOMPARE(m_xmlDb->metadata()->masterKeyChanged(), MockClock::datetimeUtc(2012, 4, 5, 17, 9, 34));
-    QCOMPARE(m_xmlDb->metadata()->masterKeyChangeRec(), 101);
-    QCOMPARE(m_xmlDb->metadata()->masterKeyChangeForce(), -1);
+    QCOMPARE(m_xmlDb->metadata()->databaseKeyChanged(), MockClock::datetimeUtc(2012, 4, 5, 17, 9, 34));
+    QCOMPARE(m_xmlDb->metadata()->databaseKeyChangeRec(), 101);
+    QCOMPARE(m_xmlDb->metadata()->databaseKeyChangeForce(), -1);
     QCOMPARE(m_xmlDb->metadata()->protectTitle(), false);
     QCOMPARE(m_xmlDb->metadata()->protectUsername(), true);
     QCOMPARE(m_xmlDb->metadata()->protectPassword(), false);
@@ -110,9 +110,9 @@ void TestKeePass2Format::testXmlMetadata()
 
 void TestKeePass2Format::testXmlCustomIcons()
 {
-    QCOMPARE(m_xmlDb->metadata()->customIcons().size(), 1);
+    QCOMPARE(m_xmlDb->metadata()->customIconsOrder().size(), 1);
     QUuid uuid = QUuid::fromRfc4122(QByteArray::fromBase64("++vyI+daLk6omox4a6kQGA=="));
-    QVERIFY(m_xmlDb->metadata()->customIcons().contains(uuid));
+    QVERIFY(m_xmlDb->metadata()->hasCustomIcon(uuid));
     QImage icon = m_xmlDb->metadata()->customIcon(uuid);
     QCOMPARE(icon.width(), 16);
     QCOMPARE(icon.height(), 16);
@@ -809,7 +809,7 @@ QSharedPointer<Kdf> TestKeePass2Format::fastKdf(QSharedPointer<Kdf> kdf) const
 {
     kdf->setRounds(1);
 
-    if (kdf->uuid() == KeePass2::KDF_ARGON2) {
+    if (kdf->uuid() == KeePass2::KDF_ARGON2D) {
         kdf->processParameters({{KeePass2::KDFPARAM_ARGON2_MEMORY, 1024}, {KeePass2::KDFPARAM_ARGON2_PARALLELISM, 1}});
     }
 

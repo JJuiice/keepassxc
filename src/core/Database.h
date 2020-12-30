@@ -82,6 +82,7 @@ public:
 
     bool isInitialized() const;
     bool isModified() const;
+    bool hasNonDataChanges() const;
     void setEmitModified(bool value);
     bool isReadOnly() const;
     void setReadOnly(bool readOnly);
@@ -119,9 +120,9 @@ public:
                 bool updateChangedTime = true,
                 bool updateTransformSalt = false,
                 bool transformKey = true);
+    QString keyError();
     QByteArray challengeResponseKey() const;
     bool challengeMasterSeed(const QByteArray& masterSeed);
-    bool verifyKey(const QSharedPointer<CompositeKey>& key) const;
     const QUuid& cipher() const;
     void setCipher(const QUuid& cipher);
     Database::CompressionAlgorithm compressionAlgorithm() const;
@@ -130,7 +131,7 @@ public:
     QSharedPointer<Kdf> kdf() const;
     void setKdf(QSharedPointer<Kdf> kdf);
     bool changeKdf(const QSharedPointer<Kdf>& kdf);
-    QByteArray transformedMasterKey() const;
+    QByteArray transformedDatabaseKey() const;
 
     static Database* databaseByUuid(const QUuid& uuid);
 
@@ -138,6 +139,7 @@ public slots:
     void markAsModified();
     void markAsClean();
     void updateCommonUsernames(int topN = 10);
+    void markNonDataChange();
 
 signals:
     void filePathChanged(const QString& oldPath, const QString& newPath);
@@ -163,7 +165,7 @@ private:
         CompressionAlgorithm compressionAlgorithm = CompressionGZip;
 
         QScopedPointer<PasswordKey> masterSeed;
-        QScopedPointer<PasswordKey> transformedMasterKey;
+        QScopedPointer<PasswordKey> transformedDatabaseKey;
         QScopedPointer<PasswordKey> challengeResponseKey;
 
         QSharedPointer<const CompositeKey> key;
@@ -173,7 +175,7 @@ private:
 
         DatabaseData()
             : masterSeed(new PasswordKey())
-            , transformedMasterKey(new PasswordKey())
+            , transformedDatabaseKey(new PasswordKey())
             , challengeResponseKey(new PasswordKey())
         {
             kdf->randomizeSeed();
@@ -184,7 +186,7 @@ private:
             filePath.clear();
 
             masterSeed.reset();
-            transformedMasterKey.reset();
+            transformedDatabaseKey.reset();
             challengeResponseKey.reset();
 
             key.reset();
@@ -200,6 +202,8 @@ private:
     bool backupDatabase(const QString& filePath);
     bool restoreDatabase(const QString& filePath);
     bool performSave(const QString& filePath, QString* error, bool atomic, bool backup);
+    void startModifiedTimer();
+    void stopModifiedTimer();
 
     QPointer<Metadata> const m_metadata;
     DatabaseData m_data;
@@ -210,6 +214,8 @@ private:
     QPointer<FileWatcher> m_fileWatcher;
     bool m_modified = false;
     bool m_emitModified;
+    bool m_hasNonDataChange = false;
+    QString m_keyError;
 
     QList<QString> m_commonUsernames;
 

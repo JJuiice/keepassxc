@@ -20,23 +20,71 @@
 
 #include "config-keepassx.h"
 #include "core/Database.h"
+#include "core/Global.h"
 #include "core/Group.h"
+#include "core/PasswordHealth.h"
+#include "gui/Icons.h"
 #include "gui/MessageBox.h"
 
+#include <QMenu>
+#include <QSortFilterProxyModel>
 #include <QStandardItemModel>
+
+namespace
+{
+    /*
+     * Check if an entry has been marked as "known bad password".
+     * These entries are to be excluded from the HIBP report.
+     *
+     * Question to reviewer: Should this be a member function of Entry?
+     * It's duplicated in EditEntryWidget::setForms, EditEntryWidget::updateEntryData,
+     * ReportsWidgetHealthcheck::customMenuRequested, and Health::Item::Item.
+     */
+    bool isKnownBad(const Entry* entry)
+    {
+        return entry->customData()->contains(PasswordHealth::OPTION_KNOWN_BAD)
+               && entry->customData()->value(PasswordHealth::OPTION_KNOWN_BAD) == TRUE_STR;
+    }
+
+    class ReportSortProxyModel : public QSortFilterProxyModel
+    {
+    public:
+        ReportSortProxyModel(QObject* parent)
+            : QSortFilterProxyModel(parent){};
+        ~ReportSortProxyModel() override = default;
+
+    protected:
+        bool lessThan(const QModelIndex& left, const QModelIndex& right) const override
+        {
+            // Sort count column by user data
+            if (left.column() == 2) {
+                return sourceModel()->data(left, Qt::UserRole).toInt()
+                       < sourceModel()->data(right, Qt::UserRole).toInt();
+            }
+            // Otherwise use default sorting
+            return QSortFilterProxyModel::lessThan(left, right);
+        }
+    };
+} // namespace
 
 ReportsWidgetHibp::ReportsWidgetHibp(QWidget* parent)
     : QWidget(parent)
     , m_ui(new Ui::ReportsWidgetHibp())
+    , m_referencesModel(new QStandardItemModel(this))
+    , m_modelProxy(new ReportSortProxyModel(this))
 {
     m_ui->setupUi(this);
 
-    m_referencesModel.reset(new QStandardItemModel());
-    m_ui->hibpTableView->setModel(m_referencesModel.data());
+    m_modelProxy->setSourceModel(m_referencesModel.data());
+    m_modelProxy->setSortLocaleAware(true);
+    m_ui->hibpTableView->setModel(m_modelProxy.data());
     m_ui->hibpTableView->setSelectionMode(QAbstractItemView::NoSelection);
     m_ui->hibpTableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    m_ui->hibpTableView->setSortingEnabled(true);
 
     connect(m_ui->hibpTableView, SIGNAL(doubleClicked(QModelIndex)), SLOT(emitEntryActivated(QModelIndex)));
+    connect(m_ui->hibpTableView, SIGNAL(customContextMenuRequested(QPoint)), SLOT(customMenuRequested(QPoint)));
+    connect(m_ui->showKnownBadCheckBox, SIGNAL(stateChanged(int)), this, SLOT(makeHibpTable()));
 #ifdef WITH_XC_NETWORKING
     connect(&m_downloader, SIGNAL(hibpResult(QString, int)), SLOT(addHibpResult(QString, int)));
     connect(&m_downloader, SIGNAL(fetchFailed(QString)), SLOT(fetchFailed(QString)));
@@ -104,18 +152,44 @@ void ReportsWidgetHibp::makeHibpTable()
         return lhs.second > rhs.second;
     });
 
+    // Display entries that are marked as "known bad"?
+    const auto showKnownBad = m_ui->showKnownBadCheckBox->isChecked();
+
+    // The colors for table cells
+    const auto red = QBrush("red");
+
     // Build the table
+    bool anyKnownBad = false;
     for (const auto& item : items) {
         const auto entry = item.first;
         const auto group = entry->group();
         const auto count = item.second;
+        auto title = entry->title();
+
+        // If the entry is marked as known bad, hide it unless the
+        // checkbox is set.
+        bool knownBad = isKnownBad(entry);
+        if (knownBad) {
+            anyKnownBad = true;
+            if (!showKnownBad) {
+                continue;
+            }
+
+            title.append(tr(" (Excluded)"));
+        }
 
         auto row = QList<QStandardItem*>();
-        row << new QStandardItem(entry->iconPixmap(), entry->title())
+        row << new QStandardItem(entry->iconPixmap(), title)
             << new QStandardItem(group->iconPixmap(), group->hierarchy().join("/"))
             << new QStandardItem(countToText(count));
+
+        if (knownBad) {
+            row[1]->setToolTip(tr("This entry is being excluded from reports"));
+        }
+
+        row[2]->setForeground(red);
+        row[2]->setData(count, Qt::UserRole);
         m_referencesModel->appendRow(row);
-        row[2]->setForeground(QBrush(QColor("red")));
 
         // Store entry pointer per table row (used in double click handler)
         m_rowToEntry.append(entry);
@@ -129,7 +203,24 @@ void ReportsWidgetHibp::makeHibpTable()
         row[0]->setForeground(QBrush(QColor("red")));
     }
 
+    // If we're done and everything is good, display a motivational message
+#ifdef WITH_XC_NETWORKING
+    if (m_downloader.passwordsRemaining() == 0 && m_pwndPasswords.isEmpty() && m_error.isEmpty()) {
+        m_referencesModel->clear();
+        m_referencesModel->setHorizontalHeaderLabels(QStringList() << tr("Congratulations, no exposed passwords!"));
+    }
+#endif
+
+    // Show the "show known bad entries" checkbox if there's any known
+    // bad entry in the database.
+    if (anyKnownBad) {
+        m_ui->showKnownBadCheckBox->show();
+    } else {
+        m_ui->showKnownBadCheckBox->hide();
+    }
+
     m_ui->hibpTableView->resizeRowsToContents();
+    m_ui->hibpTableView->sortByColumn(2, Qt::DescendingOrder);
 
     m_ui->stackedWidget->setCurrentIndex(1);
 }
@@ -176,7 +267,8 @@ void ReportsWidgetHibp::startValidation()
 {
 #ifdef WITH_XC_NETWORKING
     // Collect all passwords in the database (unless recycled, and
-    // unless empty) and submit them to the downloader.
+    // unless empty, and unless marked as "known bad") and submit them
+    // to the downloader.
     for (const auto* entry : m_db->rootGroup()->entriesRecursive()) {
         if (!entry->isRecycled() && !entry->password().isEmpty()) {
             m_downloader.add(entry->password());
@@ -233,11 +325,13 @@ void ReportsWidgetHibp::emitEntryActivated(const QModelIndex& index)
     }
 
     // Find which database entry was double-clicked
-    const auto entry = m_rowToEntry[index.row()];
+    auto mappedIndex = m_modelProxy->mapToSource(index);
+    const auto entry = m_rowToEntry[mappedIndex.row()];
     if (entry) {
         // Found it, invoke entry editor
         m_editedEntry = entry;
         m_editedPassword = entry->password();
+        m_editedKnownBad = isKnownBad(entry);
         emit entryActivated(const_cast<Entry*>(entry));
     }
 }
@@ -253,8 +347,13 @@ void ReportsWidgetHibp::refreshAfterEdit()
         return;
     }
 
-    // No need to re-validate if there was no change
-    if (m_editedEntry->password() == m_editedPassword) {
+    // No need to re-validate if there was no change that affects
+    // the HIBP result (i. e., change to the password or to the
+    // "known bad" flag)
+    if (m_editedEntry->password() == m_editedPassword && isKnownBad(m_editedEntry) == m_editedKnownBad) {
+        // Don't go through HIBP but still rebuild the table, the user might
+        // have edited the entry title.
+        makeHibpTable();
         return;
     }
 
@@ -268,6 +367,58 @@ void ReportsWidgetHibp::refreshAfterEdit()
 #endif
 
     m_editedEntry = nullptr;
+}
+
+void ReportsWidgetHibp::customMenuRequested(QPoint pos)
+{
+
+    // Find which entry has been clicked
+    const auto index = m_ui->hibpTableView->indexAt(pos);
+    if (!index.isValid()) {
+        return;
+    }
+    auto mappedIndex = m_modelProxy->mapToSource(index);
+    m_contextmenuEntry = const_cast<Entry*>(m_rowToEntry[mappedIndex.row()]);
+    if (!m_contextmenuEntry) {
+        return;
+    }
+
+    // Create the context menu
+    const auto menu = new QMenu(this);
+
+    // Create the "edit entry" menu item
+    const auto edit = new QAction(icons()->icon("entry-edit"), tr("Edit Entry..."), this);
+    menu->addAction(edit);
+    connect(edit, SIGNAL(triggered()), SLOT(editFromContextmenu()));
+
+    // Create the "exclude from reports" menu item
+    const auto knownbad = new QAction(icons()->icon("reports-exclude"), tr("Exclude from reports"), this);
+    knownbad->setCheckable(true);
+    knownbad->setChecked(m_contextmenuEntry->customData()->contains(PasswordHealth::OPTION_KNOWN_BAD)
+                         && m_contextmenuEntry->customData()->value(PasswordHealth::OPTION_KNOWN_BAD) == TRUE_STR);
+    menu->addAction(knownbad);
+    connect(knownbad, SIGNAL(toggled(bool)), SLOT(toggleKnownBad(bool)));
+
+    // Show the context menu
+    menu->popup(m_ui->hibpTableView->viewport()->mapToGlobal(pos));
+}
+
+void ReportsWidgetHibp::editFromContextmenu()
+{
+    if (m_contextmenuEntry) {
+        emit entryActivated(m_contextmenuEntry);
+    }
+}
+
+void ReportsWidgetHibp::toggleKnownBad(bool isKnownBad)
+{
+    if (!m_contextmenuEntry) {
+        return;
+    }
+
+    m_contextmenuEntry->customData()->set(PasswordHealth::OPTION_KNOWN_BAD, isKnownBad ? TRUE_STR : FALSE_STR);
+
+    makeHibpTable();
 }
 
 void ReportsWidgetHibp::saveSettings()

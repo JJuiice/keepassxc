@@ -18,20 +18,17 @@
 
 #include "Resources.h"
 
-#include <QBitmap>
+#include <QCoreApplication>
 #include <QDir>
 #include <QLibrary>
-#include <QPainter>
-#include <QStyle>
 
 #include "config-keepassx.h"
 #include "core/Config.h"
 #include "core/Global.h"
-#include "gui/MainWindow.h"
 
 Resources* Resources::m_instance(nullptr);
 
-QString Resources::dataPath(const QString& name)
+QString Resources::dataPath(const QString& name) const
 {
     if (name.isEmpty() || name.startsWith('/')) {
         return m_dataPath + name;
@@ -39,7 +36,7 @@ QString Resources::dataPath(const QString& name)
     return m_dataPath + "/" + name;
 }
 
-QString Resources::pluginPath(const QString& name)
+QString Resources::pluginPath(const QString& name) const
 {
     QStringList pluginPaths;
 
@@ -90,123 +87,27 @@ QString Resources::pluginPath(const QString& name)
     return {};
 }
 
-QString Resources::wordlistPath(const QString& name)
+QString Resources::wordlistPath(const QString& name) const
 {
     return dataPath(QStringLiteral("wordlists/%1").arg(name));
-}
-
-QIcon Resources::applicationIcon()
-{
-    return icon("keepassxc", false);
-}
-
-QIcon Resources::trayIcon()
-{
-    return useDarkIcon() ? icon("keepassxc-dark", false) : icon("keepassxc", false);
-}
-
-QIcon Resources::trayIconLocked()
-{
-    return icon("keepassxc-locked", false);
-}
-
-QIcon Resources::trayIconUnlocked()
-{
-    return useDarkIcon() ? icon("keepassxc-dark", false) : icon("keepassxc-unlocked", false);
-}
-
-QIcon Resources::icon(const QString& name, bool recolor, const QColor& overrideColor)
-{
-    QIcon icon = m_iconCache.value(name);
-
-    if (!icon.isNull() && !overrideColor.isValid()) {
-        return icon;
-    }
-
-    icon = QIcon::fromTheme(name);
-    if (getMainWindow() && recolor) {
-        QImage img = icon.pixmap(128, 128).toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
-        icon = {};
-
-        QPainter painter(&img);
-        painter.setCompositionMode(QPainter::CompositionMode_SourceAtop);
-
-        if (!overrideColor.isValid()) {
-            QPalette palette = getMainWindow()->palette();
-            painter.fillRect(0, 0, img.width(), img.height(), palette.color(QPalette::Normal, QPalette::WindowText));
-            icon.addPixmap(QPixmap::fromImage(img), QIcon::Normal);
-
-            painter.fillRect(0, 0, img.width(), img.height(), palette.color(QPalette::Active, QPalette::ButtonText));
-            icon.addPixmap(QPixmap::fromImage(img), QIcon::Active);
-
-            painter.fillRect(
-                0, 0, img.width(), img.height(), palette.color(QPalette::Active, QPalette::HighlightedText));
-            icon.addPixmap(QPixmap::fromImage(img), QIcon::Selected);
-
-            painter.fillRect(0, 0, img.width(), img.height(), palette.color(QPalette::Disabled, QPalette::WindowText));
-            icon.addPixmap(QPixmap::fromImage(img), QIcon::Disabled);
-        } else {
-            painter.fillRect(0, 0, img.width(), img.height(), overrideColor);
-            icon.addPixmap(QPixmap::fromImage(img), QIcon::Normal);
-        }
-
-#if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
-        icon.setIsMask(true);
-#endif
-    }
-
-    if (!overrideColor.isValid()) {
-        m_iconCache.insert(name, icon);
-    }
-
-    return icon;
-}
-
-QIcon Resources::onOffIcon(const QString& name, bool recolor)
-{
-    QString cacheName = "onoff/" + name;
-
-    QIcon icon = m_iconCache.value(cacheName);
-
-    if (!icon.isNull()) {
-        return icon;
-    }
-
-    QIcon on = Resources::icon(name + "-on", recolor);
-    for (const auto& size : on.availableSizes()) {
-        icon.addPixmap(on.pixmap(size, QIcon::Mode::Normal), QIcon::Mode::Normal, QIcon::On);
-        icon.addPixmap(on.pixmap(size, QIcon::Mode::Selected), QIcon::Mode::Selected, QIcon::On);
-        icon.addPixmap(on.pixmap(size, QIcon::Mode::Disabled), QIcon::Mode::Disabled, QIcon::On);
-    }
-    QIcon off = Resources::icon(name + "-off", recolor);
-    for (const auto& size : off.availableSizes()) {
-        icon.addPixmap(off.pixmap(size, QIcon::Mode::Normal), QIcon::Mode::Normal, QIcon::Off);
-        icon.addPixmap(off.pixmap(size, QIcon::Mode::Selected), QIcon::Mode::Selected, QIcon::Off);
-        icon.addPixmap(off.pixmap(size, QIcon::Mode::Disabled), QIcon::Mode::Disabled, QIcon::Off);
-    }
-
-    m_iconCache.insert(cacheName, icon);
-
-    return icon;
 }
 
 Resources::Resources()
 {
     const QString appDirPath = QCoreApplication::applicationDirPath();
 #if defined(Q_OS_UNIX) && !(defined(Q_OS_MACOS) && defined(WITH_APP_BUNDLE))
-    testResourceDir(KEEPASSX_DATA_DIR) || testResourceDir(QStringLiteral("%1/../%2").arg(appDirPath, KEEPASSX_DATA_DIR))
-        || testResourceDir(QStringLiteral("%1/%2").arg(KEEPASSX_PREFIX_DIR, KEEPASSX_DATA_DIR));
+    trySetResourceDir(KEEPASSX_DATA_DIR) || trySetResourceDir(QString("%1/../%2").arg(appDirPath, KEEPASSX_DATA_DIR))
+        || trySetResourceDir(QString("%1/%2").arg(KEEPASSX_PREFIX_DIR, KEEPASSX_DATA_DIR));
 #elif defined(Q_OS_MACOS) && defined(WITH_APP_BUNDLE)
-    testResourceDir(appDirPath + QStringLiteral("/../Resources"));
+    trySetResourceDir(appDirPath + QStringLiteral("/../Resources"));
 #elif defined(Q_OS_WIN)
-    testResourceDir(appDirPath + QStringLiteral("/share"));
+    trySetResourceDir(appDirPath + QStringLiteral("/share"));
 #endif
 
     if (m_dataPath.isEmpty()) {
         // Last ditch check if we are running from inside the src or test build directory
-        testResourceDir(appDirPath + QStringLiteral("/../../share"))
-            || testResourceDir(appDirPath + QStringLiteral("/../share"))
-            || testResourceDir(appDirPath + QStringLiteral("/../../../share"));
+        trySetResourceDir(appDirPath + QStringLiteral("/../share"))
+            || trySetResourceDir(appDirPath + QStringLiteral("/../../share"));
     }
 
     if (m_dataPath.isEmpty()) {
@@ -214,28 +115,20 @@ Resources::Resources()
     }
 }
 
-bool Resources::testResourceDir(const QString& dir)
+bool Resources::trySetResourceDir(const QString& path)
 {
-    if (QFile::exists(dir + QStringLiteral("/icons/application/256x256/apps/keepassxc.png"))) {
-        m_dataPath = QDir::cleanPath(dir);
+    QDir dir(path);
+    if (dir.exists()) {
+        m_dataPath = dir.canonicalPath();
         return true;
     }
     return false;
-}
-
-bool Resources::useDarkIcon()
-{
-    return config()->get(Config::GUI_DarkTrayIcon).toBool();
 }
 
 Resources* Resources::instance()
 {
     if (!m_instance) {
         m_instance = new Resources();
-
-        Q_INIT_RESOURCE(icons);
-        QIcon::setThemeSearchPaths(QStringList{":/icons"} << QIcon::themeSearchPaths());
-        QIcon::setThemeName("application");
     }
 
     return m_instance;

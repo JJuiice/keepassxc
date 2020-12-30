@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2017 KeePassXC Team <team@keepassxc.org>
+ *  Copyright (C) 2020 KeePassXC Team <team@keepassxc.org>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 #include <QToolButton>
 
 #include "core/Config.h"
-#include "core/Resources.h"
+#include "gui/Icons.h"
 #include "gui/widgets/PopupHelpWidget.h"
 
 SearchWidget::SearchWidget(QWidget* parent)
@@ -45,7 +45,6 @@ SearchWidget::SearchWidget(QWidget* parent)
     m_clearSearchTimer->setSingleShot(true);
 
     connect(m_ui->searchEdit, SIGNAL(textChanged(QString)), SLOT(startSearchTimer()));
-    connect(m_ui->clearIcon, SIGNAL(triggered(bool)), m_ui->searchEdit, SLOT(clear()));
     connect(m_ui->helpIcon, SIGNAL(triggered()), SLOT(toggleHelp()));
     connect(m_ui->searchIcon, SIGNAL(triggered()), SLOT(showSearchMenu()));
     connect(m_searchTimer, SIGNAL(timeout()), SLOT(startSearch()));
@@ -69,15 +68,11 @@ SearchWidget::SearchWidget(QWidget* parent)
     m_actionLimitGroup->setCheckable(true);
     m_actionLimitGroup->setChecked(config()->get(Config::SearchLimitGroup).toBool());
 
-    m_ui->searchIcon->setIcon(resources()->icon("system-search"));
+    m_ui->searchIcon->setIcon(icons()->icon("system-search"));
     m_ui->searchEdit->addAction(m_ui->searchIcon, QLineEdit::LeadingPosition);
 
-    m_ui->helpIcon->setIcon(resources()->icon("system-help"));
+    m_ui->helpIcon->setIcon(icons()->icon("system-help"));
     m_ui->searchEdit->addAction(m_ui->helpIcon, QLineEdit::TrailingPosition);
-
-    m_ui->clearIcon->setIcon(resources()->icon("edit-clear-locationbar-rtl"));
-    m_ui->clearIcon->setVisible(false);
-    m_ui->searchEdit->addAction(m_ui->clearIcon, QLineEdit::TrailingPosition);
 
     // Fix initial visibility of actions (bug in Qt)
     for (QToolButton* toolButton : m_ui->searchEdit->findChildren<QToolButton*>()) {
@@ -137,10 +132,11 @@ void SearchWidget::connectSignals(SignalMultiplexer& mx)
     mx.connect(this, SIGNAL(caseSensitiveChanged(bool)), SLOT(setSearchCaseSensitive(bool)));
     mx.connect(this, SIGNAL(limitGroupChanged(bool)), SLOT(setSearchLimitGroup(bool)));
     mx.connect(this, SIGNAL(copyPressed()), SLOT(copyPassword()));
-    mx.connect(this, SIGNAL(downPressed()), SLOT(setFocus()));
+    mx.connect(this, SIGNAL(downPressed()), SLOT(focusOnEntries()));
     mx.connect(SIGNAL(clearSearch()), m_ui->searchEdit, SLOT(clear()));
     mx.connect(SIGNAL(entrySelectionChanged()), this, SLOT(resetSearchClearTimer()));
     mx.connect(SIGNAL(currentModeChanged(DatabaseWidget::Mode)), this, SLOT(resetSearchClearTimer()));
+    mx.connect(SIGNAL(databaseUnlocked()), this, SLOT(searchFocus()));
     mx.connect(m_ui->searchEdit, SIGNAL(returnPressed()), SLOT(switchToEntryEdit()));
 }
 
@@ -149,8 +145,6 @@ void SearchWidget::databaseChanged(DatabaseWidget* dbWidget)
     if (dbWidget != nullptr) {
         // Set current search text from this database
         m_ui->searchEdit->setText(dbWidget->getCurrentSearch());
-        // Keyboard focus on search widget at database unlocking
-        connect(dbWidget, SIGNAL(databaseUnlocked()), this, SLOT(searchFocus()));
         // Enforce search policy
         emit caseSensitiveChanged(m_actionCaseSensitive->isChecked());
         emit limitGroupChanged(m_actionLimitGroup->isChecked());
@@ -172,9 +166,6 @@ void SearchWidget::startSearch()
     if (!m_searchTimer->isActive()) {
         m_searchTimer->stop();
     }
-
-    bool hasText = m_ui->searchEdit->text().length() > 0;
-    m_ui->clearIcon->setVisible(hasText);
 
     search(m_ui->searchEdit->text());
 }

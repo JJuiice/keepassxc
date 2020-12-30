@@ -36,11 +36,23 @@ namespace FdoSecrets
     class Item;
     class PromptBase;
     class Service;
-    class Collection : public DBusObject
+    class Collection : public DBusObjectHelper<Collection, CollectionAdaptor>
     {
         Q_OBJECT
-    public:
+
         explicit Collection(Service* parent, DatabaseWidget* backend);
+
+    public:
+        /**
+         * @brief Create a new instance of `Collection`
+         * @param parent the owning Service
+         * @param backend the widget containing the database
+         * @return pointer to created instance, or nullptr when error happens.
+         * This may be caused by
+         *   - DBus path registration error
+         *   - database has no exposed group
+         */
+        static Collection* Create(Service* parent, DatabaseWidget* backend);
 
         DBusReturn<const QList<Item*>> items() const;
 
@@ -59,9 +71,9 @@ namespace FdoSecrets
         createItem(const QVariantMap& properties, const SecretStruct& secret, bool replace, PromptBase*& prompt);
 
     signals:
-        void itemCreated(const Item* item);
-        void itemDeleted(const Item* item);
-        void itemChanged(const Item* item);
+        void itemCreated(Item* item);
+        void itemDeleted(Item* item);
+        void itemChanged(Item* item);
 
         void collectionChanged();
         void collectionAboutToDelete();
@@ -101,8 +113,8 @@ namespace FdoSecrets
         static EntrySearcher::SearchTerm attributeToTerm(const QString& key, const QString& value);
 
     public slots:
-        // expose some methods for Prmopt to use
-        void doLock();
+        // expose some methods for Prompt to use
+        bool doLock();
         void doUnlock();
         // will remove self
         void doDelete();
@@ -110,11 +122,15 @@ namespace FdoSecrets
         // delete the Entry in backend from this collection
         void doDeleteEntries(QList<Entry*> entries);
 
+        // force reload info from backend, potentially delete self
+        bool reloadBackend();
+
     private slots:
         void onDatabaseLockChanged();
         void onDatabaseExposedGroupChanged();
-        // force reload info from backend, potentially delete self
-        void reloadBackend();
+
+        // calls reloadBackend, delete self when error
+        void reloadBackendOrDelete();
 
     private:
         friend class DeleteCollectionPrompt;
@@ -154,8 +170,6 @@ namespace FdoSecrets
         QSet<QString> m_aliases;
         QList<Item*> m_items;
         QMap<const Entry*, Item*> m_entryToItem;
-
-        bool m_registered;
     };
 
 } // namespace FdoSecrets

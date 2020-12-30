@@ -35,22 +35,19 @@
 #include "core/ListDeleter.h"
 #include "core/Resources.h"
 #include "core/Tools.h"
+#include "gui/MainWindow.h"
 #include "gui/MessageBox.h"
-
-#ifdef Q_OS_MAC
-#include "gui/osutils/macutils/MacUtils.h"
-#endif
+#include "gui/osutils/OSUtils.h"
 
 AutoType* AutoType::m_instance = nullptr;
 
 AutoType::AutoType(QObject* parent, bool test)
     : QObject(parent)
     , m_autoTypeDelay(0)
-    , m_currentGlobalKey(static_cast<Qt::Key>(0))
-    , m_currentGlobalModifiers(nullptr)
     , m_pluginLoader(new QPluginLoader(this))
     , m_plugin(nullptr)
     , m_executor(nullptr)
+    , m_windowState(WindowState::Normal)
     , m_windowForGlobal(0)
 {
     // prevent crash when the plugin has unresolved symbols
@@ -94,7 +91,11 @@ void AutoType::loadPlugin(const QString& pluginPath)
         if (m_plugin) {
             if (m_plugin->isAvailable()) {
                 m_executor = m_plugin->createExecutor();
-                connect(pluginInstance, SIGNAL(globalShortcutTriggered()), SLOT(startGlobalAutoType()));
+                connect(osUtils, &OSUtilsBase::globalShortcutTriggered, this, [this](QString name) {
+                    if (name == "autotype") {
+                        startGlobalAutoType();
+                    }
+                });
             } else {
                 unloadPlugin();
             }
@@ -151,44 +152,18 @@ void AutoType::raiseWindow()
 #endif
 }
 
-bool AutoType::registerGlobalShortcut(Qt::Key key, Qt::KeyboardModifiers modifiers)
+bool AutoType::registerGlobalShortcut(Qt::Key key, Qt::KeyboardModifiers modifiers, QString* error)
 {
-    Q_ASSERT(key);
-    Q_ASSERT(modifiers);
-
     if (!m_plugin) {
         return false;
     }
 
-    if (key != m_currentGlobalKey || modifiers != m_currentGlobalModifiers) {
-        if (m_currentGlobalKey && m_currentGlobalModifiers) {
-            m_plugin->unregisterGlobalShortcut(m_currentGlobalKey, m_currentGlobalModifiers);
-        }
-
-        if (m_plugin->registerGlobalShortcut(key, modifiers)) {
-            m_currentGlobalKey = key;
-            m_currentGlobalModifiers = modifiers;
-            return true;
-        }
-        return false;
-    }
-    return true;
+    return osUtils->registerGlobalShortcut("autotype", key, modifiers, error);
 }
 
 void AutoType::unregisterGlobalShortcut()
 {
-    if (m_plugin && m_currentGlobalKey && m_currentGlobalModifiers) {
-        m_plugin->unregisterGlobalShortcut(m_currentGlobalKey, m_currentGlobalModifiers);
-    }
-}
-
-int AutoType::callEventFilter(void* event)
-{
-    if (!m_plugin) {
-        return -1;
-    }
-
-    return m_plugin->platformEventFilter(event);
+    osUtils->unregisterGlobalShortcut("autotype");
 }
 
 /**
@@ -227,10 +202,11 @@ void AutoType::executeAutoTypeActions(const Entry* entry, QWidget* hideWindow, c
                                        "KeePassXC."));
             return;
         }
+
         macUtils()->raiseLastActiveWindow();
         m_plugin->hideOwnWindow();
 #else
-        hideWindow->showMinimized();
+        getMainWindow()->minimizeOrHide();
 #endif
     }
 
@@ -266,7 +242,7 @@ void AutoType::executeAutoTypeActions(const Entry* entry, QWidget* hideWindow, c
 
 /**
  * Single Autotype entry-point function
- * Perfom autotype sequence in the active window
+ * Look up the Auto-Type sequence for the given entry then perfom Auto-Type in the active window
  */
 void AutoType::performAutoType(const Entry* entry, QWidget* hideWindow)
 {
@@ -282,10 +258,52 @@ void AutoType::performAutoType(const Entry* entry, QWidget* hideWindow)
     executeAutoTypeActions(entry, hideWindow, sequences.first());
 }
 
+/**
+ * Extra Autotype entry-point function
+ * Perfom Auto-Type of the directly specified sequence in the active window
+ */
+void AutoType::performAutoTypeWithSequence(const Entry* entry, const QString& sequence, QWidget* hideWindow)
+{
+    if (!m_plugin) {
+        return;
+    }
+
+    executeAutoTypeActions(entry, hideWindow, sequence);
+}
+
 void AutoType::startGlobalAutoType()
 {
     m_windowForGlobal = m_plugin->activeWindow();
     m_windowTitleForGlobal = m_plugin->activeWindowTitle();
+#ifdef Q_OS_MACOS
+    // Determine if the user has given proper permissions to KeePassXC to perform Auto-Type
+    static bool accessibilityChecked = false;
+    if (!accessibilityChecked) {
+        if (macUtils()->enableAccessibility() && macUtils()->enableScreenRecording()) {
+            accessibilityChecked = true;
+        } else if (getMainWindow()) {
+            // Does not have required permissions to Auto-Type, ignore the event
+            MessageBox::information(
+                nullptr,
+                tr("Permission Required"),
+                tr("KeePassXC requires the Accessibility and Screen Recorder permission in order to perform global "
+                   "Auto-Type. Screen Recording is necessary to use the window title to find entries. If you "
+                   "already granted permission, you may have to restart KeePassXC."));
+            return;
+        }
+    }
+
+    m_windowState = WindowState::Normal;
+    if (getMainWindow()) {
+        if (getMainWindow()->isMinimized()) {
+            m_windowState = WindowState::Minimized;
+        }
+        if (getMainWindow()->isHidden()) {
+            m_windowState = WindowState::Hidden;
+        }
+    }
+#endif
+
     emit globalAutoTypeTriggered();
 }
 
@@ -309,10 +327,14 @@ void AutoType::performGlobalAutoType(const QList<QSharedPointer<Database>>& dbLi
     }
 
     QList<AutoTypeMatch> matchList;
+    bool hideExpired = config()->get(Config::AutoTypeHideExpiredEntry).toBool();
 
     for (const auto& db : dbList) {
         const QList<Entry*> dbEntries = db->rootGroup()->entriesRecursive();
         for (Entry* entry : dbEntries) {
+            if (hideExpired && entry->isExpired()) {
+                continue;
+            }
             const QSet<QString> sequences = autoTypeSequences(entry, m_windowTitleForGlobal).toSet();
             for (const QString& sequence : sequences) {
                 if (!sequence.isEmpty()) {
@@ -332,9 +354,12 @@ void AutoType::performGlobalAutoType(const QList<QSharedPointer<Database>>& dbLi
                                 .append(m_windowTitleForGlobal));
             msgBox->setIcon(QMessageBox::Information);
             msgBox->setStandardButtons(QMessageBox::Ok);
-            msgBox->show();
-            msgBox->raise();
-            msgBox->activateWindow();
+#ifdef Q_OS_MACOS
+            m_plugin->raiseOwnWindow();
+            Tools::wait(200);
+#endif
+            msgBox->exec();
+            restoreWindowState();
         }
 
         m_inGlobalAutoTypeDialog.unlock();
@@ -361,8 +386,23 @@ void AutoType::performGlobalAutoType(const QList<QSharedPointer<Database>>& dbLi
     }
 }
 
+void AutoType::restoreWindowState()
+{
+#ifdef Q_OS_MAC
+    if (getMainWindow()) {
+        if (m_windowState == WindowState::Minimized) {
+            getMainWindow()->showMinimized();
+        } else if (m_windowState == WindowState::Hidden) {
+            getMainWindow()->hideWindow();
+        }
+    }
+#endif
+}
+
 void AutoType::performAutoTypeFromGlobal(AutoTypeMatch match)
 {
+    restoreWindowState();
+
     m_plugin->raiseWindow(m_windowForGlobal);
     executeAutoTypeActions(match.entry, nullptr, match.sequence, m_windowForGlobal);
 
@@ -380,6 +420,7 @@ void AutoType::autoTypeRejectedFromGlobal()
     m_windowForGlobal = 0;
     m_windowTitleForGlobal.clear();
 
+    restoreWindowState();
     emit autotypeRejected();
 }
 

@@ -20,10 +20,11 @@
 
 #include "core/AsyncTask.h"
 #include "core/Database.h"
+#include "core/Global.h"
 #include "core/Group.h"
 #include "core/Metadata.h"
 #include "core/PasswordHealth.h"
-#include "core/Resources.h"
+#include "gui/Icons.h"
 
 #include <QFileInfo>
 #include <QHash>
@@ -43,6 +44,7 @@ namespace
         int nPwdsShort = 0; // Number of passwords 8 characters or less in size
         int nPwdsUnique = 0; // Number of unique passwords
         int nPwdsReused = 0; // Number of non-unique passwords
+        int nKnownBad = 0; // Number of known bad entries
         int pwdTotalLen = 0; // Total length of all passwords
 
         // Ctor does all the work
@@ -138,6 +140,11 @@ namespace
                             ++nPwdsWeak;
                         }
 
+                        if (entry->customData()->contains(PasswordHealth::OPTION_KNOWN_BAD)
+                            && entry->customData()->value(PasswordHealth::OPTION_KNOWN_BAD) == TRUE_STR) {
+                            ++nKnownBad;
+                        }
+
                         pwdTotalLen += pwd.size();
                         m_passwords[pwd]++;
                     }
@@ -150,7 +157,7 @@ namespace
 ReportsWidgetStatistics::ReportsWidgetStatistics(QWidget* parent)
     : QWidget(parent)
     , m_ui(new Ui::ReportsWidgetStatistics())
-    , m_errIcon(Resources::instance()->icon("dialog-error"))
+    , m_errIcon(icons()->icon("dialog-error"))
 {
     m_ui->setupUi(this);
 
@@ -235,6 +242,11 @@ void ReportsWidgetStatistics::calculateStats()
                 QString::number(stats->nPwdsWeak),
                 stats->nPwdsWeak > 0,
                 tr("Recommend using long, randomized passwords with a rating of 'good' or 'excellent'."));
+    addStatsRow(tr("Entries excluded from reports"),
+                QString::number(stats->nKnownBad),
+                stats->nKnownBad > 0,
+                tr("Excluding entries from reports, e. g. because they are known to have a poor password, isn't "
+                   "necessarily a problem but you should keep an eye on them."));
     addStatsRow(tr("Average password length"),
                 tr("%1 characters").arg(stats->averagePwdLength()),
                 stats->isAvgPwdTooShort(),

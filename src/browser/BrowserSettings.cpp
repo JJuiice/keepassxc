@@ -162,16 +162,6 @@ void BrowserSettings::setNoMigrationPrompt(bool prompt)
     config()->set(Config::Browser_NoMigrationPrompt, prompt);
 }
 
-bool BrowserSettings::supportBrowserProxy()
-{
-    return config()->get(Config::Browser_SupportBrowserProxy).toBool();
-}
-
-void BrowserSettings::setSupportBrowserProxy(bool enabled)
-{
-    config()->set(Config::Browser_SupportBrowserProxy, enabled);
-}
-
 bool BrowserSettings::useCustomProxy()
 {
     return config()->get(Config::Browser_UseCustomProxy).toBool();
@@ -184,9 +174,6 @@ void BrowserSettings::setUseCustomProxy(bool enabled)
 
 QString BrowserSettings::customProxyLocation()
 {
-    if (!useCustomProxy()) {
-        return QString();
-    }
     return config()->get(Config::Browser_CustomProxyLocation).toString();
 }
 
@@ -194,6 +181,53 @@ void BrowserSettings::setCustomProxyLocation(const QString& location)
 {
     config()->set(Config::Browser_CustomProxyLocation, location);
 }
+
+bool BrowserSettings::customBrowserSupport()
+{
+    return config()->get(Config::Browser_UseCustomBrowser).toBool();
+}
+
+void BrowserSettings::setCustomBrowserSupport(bool enabled)
+{
+    config()->set(Config::Browser_UseCustomBrowser, enabled);
+}
+
+int BrowserSettings::customBrowserType()
+{
+    return config()->get(Config::Browser_CustomBrowserType).toInt();
+}
+
+void BrowserSettings::setCustomBrowserType(int type)
+{
+    config()->set(Config::Browser_CustomBrowserType, type);
+}
+
+QString BrowserSettings::customBrowserLocation()
+{
+    return config()->get(Config::Browser_CustomBrowserLocation).toString();
+}
+
+void BrowserSettings::setCustomBrowserLocation(const QString& location)
+{
+    config()->set(Config::Browser_CustomBrowserLocation, location);
+}
+
+QString BrowserSettings::proxyLocation()
+{
+    return m_nativeMessageInstaller.getProxyPath();
+}
+
+#ifdef QT_DEBUG
+QString BrowserSettings::customExtensionId()
+{
+    return config()->get(Config::Browser_CustomExtensionId).toString();
+}
+
+void BrowserSettings::setCustomExtensionId(const QString& id)
+{
+    config()->set(Config::Browser_CustomExtensionId, id);
+}
+#endif
 
 bool BrowserSettings::updateBinaryPath()
 {
@@ -215,81 +249,14 @@ void BrowserSettings::setAllowExpiredCredentials(bool enabled)
     config()->set(Config::Browser_AllowExpiredCredentials, enabled);
 }
 
-bool BrowserSettings::chromeSupport()
+bool BrowserSettings::browserSupport(BrowserShared::SupportedBrowsers browser)
 {
-    return m_hostInstaller.checkIfInstalled(HostInstaller::SupportedBrowsers::CHROME);
+    return m_nativeMessageInstaller.isBrowserEnabled(browser);
 }
 
-void BrowserSettings::setChromeSupport(bool enabled)
+void BrowserSettings::setBrowserSupport(BrowserShared::SupportedBrowsers browser, bool enabled)
 {
-    m_hostInstaller.installBrowser(
-        HostInstaller::SupportedBrowsers::CHROME, enabled, supportBrowserProxy(), customProxyLocation());
-}
-
-bool BrowserSettings::chromiumSupport()
-{
-    return m_hostInstaller.checkIfInstalled(HostInstaller::SupportedBrowsers::CHROMIUM);
-}
-
-void BrowserSettings::setChromiumSupport(bool enabled)
-{
-    m_hostInstaller.installBrowser(
-        HostInstaller::SupportedBrowsers::CHROMIUM, enabled, supportBrowserProxy(), customProxyLocation());
-}
-
-bool BrowserSettings::firefoxSupport()
-{
-    return m_hostInstaller.checkIfInstalled(HostInstaller::SupportedBrowsers::FIREFOX);
-}
-
-void BrowserSettings::setFirefoxSupport(bool enabled)
-{
-    m_hostInstaller.installBrowser(
-        HostInstaller::SupportedBrowsers::FIREFOX, enabled, supportBrowserProxy(), customProxyLocation());
-}
-
-bool BrowserSettings::vivaldiSupport()
-{
-    return m_hostInstaller.checkIfInstalled(HostInstaller::SupportedBrowsers::VIVALDI);
-}
-
-void BrowserSettings::setVivaldiSupport(bool enabled)
-{
-    m_hostInstaller.installBrowser(
-        HostInstaller::SupportedBrowsers::VIVALDI, enabled, supportBrowserProxy(), customProxyLocation());
-}
-
-bool BrowserSettings::braveSupport()
-{
-    return m_hostInstaller.checkIfInstalled(HostInstaller::SupportedBrowsers::BRAVE);
-}
-
-void BrowserSettings::setBraveSupport(bool enabled)
-{
-    m_hostInstaller.installBrowser(
-        HostInstaller::SupportedBrowsers::BRAVE, enabled, supportBrowserProxy(), customProxyLocation());
-}
-
-bool BrowserSettings::torBrowserSupport()
-{
-    return m_hostInstaller.checkIfInstalled(HostInstaller::SupportedBrowsers::TOR_BROWSER);
-}
-
-void BrowserSettings::setTorBrowserSupport(bool enabled)
-{
-    m_hostInstaller.installBrowser(
-        HostInstaller::SupportedBrowsers::TOR_BROWSER, enabled, supportBrowserProxy(), customProxyLocation());
-}
-
-bool BrowserSettings::edgeSupport()
-{
-    return m_hostInstaller.checkIfInstalled(HostInstaller::SupportedBrowsers::EDGE);
-}
-
-void BrowserSettings::setEdgeSupport(bool enabled)
-{
-    m_hostInstaller.installBrowser(
-        HostInstaller::SupportedBrowsers::EDGE, enabled, supportBrowserProxy(), customProxyLocation());
+    m_nativeMessageInstaller.setBrowserEnabled(browser, enabled);
 }
 
 bool BrowserSettings::passwordUseNumbers()
@@ -563,13 +530,7 @@ QJsonObject BrowserSettings::generatePassword()
     return password;
 }
 
-void BrowserSettings::updateBinaryPaths(const QString& customProxyLocation)
+void BrowserSettings::updateBinaryPaths()
 {
-    bool isProxy = supportBrowserProxy();
-    m_hostInstaller.updateBinaryPaths(isProxy, customProxyLocation);
-}
-
-bool BrowserSettings::checkIfProxyExists(QString& path)
-{
-    return m_hostInstaller.checkIfProxyExists(supportBrowserProxy(), customProxyLocation(), path);
+    m_nativeMessageInstaller.updateBinaryPaths();
 }
